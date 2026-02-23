@@ -1,7 +1,9 @@
 import { type_academia } from "../types/dbSchemas"
-import { academiaSchema } from "../utils/validations/academiaValidation";
 import AcademiaService from "../services/academiaService";
 import { Request, Response } from 'express';
+import CommonResponse from "../utils/helpers/commonResponse";
+import { ZodError } from "zod";
+import HttpStatusCode from "../utils/helpers/httpStatusCode";
 
 class AcademiaController {
     private service: AcademiaService;
@@ -9,44 +11,58 @@ class AcademiaController {
         this.service = new AcademiaService();
     }
 
-    createAcademia = async (req: { body: type_academia }, res: Response) => {
-        const { nome, endereco_numero, endereco_rua, endereco_bairro, endereco_cidade, endereco_estado } = req.body;
-        if (!nome || !endereco_numero || !endereco_rua || !endereco_bairro || !endereco_cidade || !endereco_estado) {
-            return res.status(400).json({ error: "Todos os campos são obrigatórios" });
-        }
-
+    createAcademia = async (req: Request, res: Response) => {
         try {
-            academiaSchema.parse({ nome, endereco_numero, endereco_rua, endereco_bairro, endereco_cidade, endereco_estado });
             const novaAcademia: type_academia = {
-                nome: nome,
-                endereco_numero: endereco_numero,
-                endereco_rua: endereco_rua,
-                endereco_bairro: endereco_bairro,
-                endereco_cidade: endereco_cidade,
-                endereco_estado: endereco_estado,
+                nome: req.body.nome,
+                endereco_numero: req.body.endereco_numero,
+                endereco_rua: req.body.endereco_rua,
+                endereco_bairro: req.body.endereco_bairro,
+                endereco_cidade: req.body.endereco_cidade,
+                endereco_estado: req.body.endereco_estado,
                 created_at: new Date(),
-            }
+            };
 
             const resposta = await this.service.createAcademia(novaAcademia);
-            res.status(201).json(resposta);
+            return CommonResponse.created(res, resposta, HttpStatusCode.CREATED.message);
         } catch (error) {
-            if (error instanceof Error) {
-                return res.status(400).json({ error: error.message });
+            if (error instanceof ZodError) {
+                return CommonResponse.error(res, HttpStatusCode.UNPROCESSABLE_ENTITY.code, null, null, error.issues, HttpStatusCode.UNPROCESSABLE_ENTITY.message);
             }
-            return res.status(500).json({ error: "Erro interno do servidor" });
+            return CommonResponse.serverError(res, error, HttpStatusCode.INTERNAL_SERVER_ERROR.message);
         }
     }
 
     getAllAcademia = async (req: Request, res: Response) => {
-        try { 
+        try {
             const resposta = await this.service.getAllAcademias();
             res.status(200).json(resposta);
-         } catch (error) { 
+        } catch (error) {
             if (error instanceof Error) {
-                return res.status(400).json({ error: error.message });
+                return CommonResponse.error(res, 400, null, null, []);
             }
-            return res.status(500).json({ error: "Erro interno do servidor" });
-         }
+            return CommonResponse.serverError(res, error);
+        }
+    }
+
+    getAcademiaById = async (req: Request, res: Response) => {
+        const { id } = req.params;
+        console.log(`[Controller] id:${id}`)
+        if(!id) {
+            return CommonResponse.error(res, HttpStatusCode.BAD_REQUEST.code, null, 'id', [], 'O id é obrigatório');
+        }
+
+        let id_param = Number(id)
+        console.log(`[Controller] id:${id}`)
+        try {
+            const resposta = await this.service.getAcademiaById(id_param);
+            return CommonResponse.success(res, resposta, HttpStatusCode.OK.code);
+        } catch (error) {
+            if (error instanceof Error) {
+                return CommonResponse.error(res, HttpStatusCode.NOT_FOUND.code, null, null, [], 'Academia não encontrada');
+            }
+            return CommonResponse.serverError(res, error);
+        }
     }
 }
 

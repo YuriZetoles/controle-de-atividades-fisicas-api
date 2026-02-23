@@ -7,5 +7,6 @@ const academiaController = new Academia_Controller();
 router
     .post('/academia', academiaController.createAcademia)
     .get('/academia', academiaController.getAllAcademia)
+    .get('/academia/:id', academiaController.getAcademiaById)
 
 export default router;
