@@ -22,13 +22,20 @@ export const aluno = pgTable('aluno', {
     url_foto: varchar('url_foto', { length: 255 }),
     nome: varchar('nome', { length: 255 }).notNull(),
     email: varchar('email', { length: 255 }).notNull().unique(),
-    senha: varchar('senha', { length: 255 }).notNull(), 
+    senha: varchar('senha', { length: 255 }).notNull(),
     data_nascimento: date('data_nascimento').notNull(),
-    sexo: sexoEnum('sexo').notNull(), 
+    sexo: sexoEnum('sexo').notNull(),
     status_conta: boolean('status_conta').notNull().default(true),
     created_at: timestamp('created_at').defaultNow().notNull(),
     academia_id: integer('academia_id').notNull().references(() => academia.id),
 });
+
+export const aluno_academia = pgTable('aluno_academia', {
+    aluno_id: integer('aluno_id').notNull().references(() => aluno.id),
+    academia_id: integer('academia_id').notNull().references(() => academia.id),
+}, (table) => [
+    primaryKey({ columns: [table.aluno_id, table.academia_id] })
+]);
 
 export const avaliacao_fisica = pgTable('avaliacao_fisica', {
     id: integer('id').primaryKey().generatedAlwaysAsIdentity(),
@@ -43,17 +50,24 @@ export const treinador = pgTable('treinador', {
     url_foto: varchar('url_foto', { length: 255 }),
     nome: varchar('nome', { length: 255 }).notNull(),
     email: varchar('email', { length: 255 }).notNull().unique(),
-    senha: varchar('senha', { length: 255 }).notNull(), 
+    senha: varchar('senha', { length: 255 }).notNull(),
     data_nascimento: date('data_nascimento').notNull(),
-    sexo: sexoEnum('sexo').notNull(), 
+    sexo: sexoEnum('sexo').notNull(),
     cref: varchar('cref', { length: 50 }).notNull().unique(),
-    turnos: turnoEnum('turnos').array().notNull(), 
+    turnos: turnoEnum('turnos').array().notNull(),
     especializacao: varchar('especializacao', { length: 255 }).notNull(),
     graduacao: varchar('graduacao', { length: 255 }).notNull(),
     status_conta: boolean('status_conta').notNull().default(true),
     created_at: timestamp('created_at').defaultNow().notNull(),
     academia_id: integer('academia_id').notNull().references(() => academia.id),
 });
+
+export const treinador_academia = pgTable('treinador_academia', {
+    treinador_id: integer('treinador_id').notNull().references(() => treinador.id),
+    academia_id: integer('academia_id').notNull().references(() => academia.id),
+}, (table) => [
+    primaryKey({ columns: [table.treinador_id, table.academia_id] })
+])
 
 export const musculo = pgTable('musculo', {
     id: integer('id').primaryKey().generatedAlwaysAsIdentity(),
@@ -74,7 +88,7 @@ export const exercicio = pgTable('exercicio', {
 });
 
 export const exercicio_musculo = pgTable('exercicio_musculo', {
-    tipo_ativacao: tipoAtivacaoEnum('tipo_ativacao').notNull(), 
+    tipo_ativacao: tipoAtivacaoEnum('tipo_ativacao').notNull(),
     exercicio_id: integer('exercicio_id').notNull().references(() => exercicio.id),
     musculo_id: integer('musculo_id').notNull().references(() => musculo.id),
 }, (table) => [
@@ -112,18 +126,31 @@ export const item_rotina = pgTable('item_rotina', {
 
 // 1. Relações da Academia
 export const academiaRelations = relations(academia, ({ many }) => ({
-    alunos: many(aluno),
-    treinadores: many(treinador),
+    alunoAcademias: many(aluno_academia),
+    treinadorAcademias: many(treinador_academia),
 }));
 
 // 2. Relações do Aluno
 export const alunoRelations = relations(aluno, ({ one, many }) => ({
-    academia: one(academia, {
+    academiaPrincipal: one(academia, {
         fields: [aluno.academia_id],
         references: [academia.id],
     }),
+    alunoAcademias: many(aluno_academia),
     avaliacoesFisicas: many(avaliacao_fisica),
     rotinasTreino: many(rotina_treino),
+}));
+
+// 2.1 Relações da Tabela Associativa: Aluno <-> Academia
+export const alunoAcademiaRelations = relations(aluno_academia, ({ one }) => ({
+    aluno: one(aluno, {
+        fields: [aluno_academia.aluno_id],
+        references: [aluno.id],
+    }),
+    academia: one(academia, {
+        fields: [aluno_academia.academia_id],
+        references: [academia.id],
+    }),
 }));
 
 // 3. Relações da Avaliação Física
@@ -136,11 +163,24 @@ export const avaliacaoFisicaRelations = relations(avaliacao_fisica, ({ one }) =>
 
 // 4. Relações do Treinador
 export const treinadorRelations = relations(treinador, ({ one, many }) => ({
-    academia: one(academia, {
+    academiaPrincipal: one(academia, {
         fields: [treinador.academia_id],
         references: [academia.id],
     }),
+    treinadorAcademias: many(treinador_academia),
     rotinasCriadas: many(rotina_treino),
+}));
+
+// 4.1 Relações da Tabela Associativa: Treinador <-> Academia
+export const treinadorAcademiaRelations = relations(treinador_academia, ({ one }) => ({
+    treinador: one(treinador, {
+        fields: [treinador_academia.treinador_id],
+        references: [treinador.id],
+    }),
+    academia: one(academia, {
+        fields: [treinador_academia.academia_id],
+        references: [academia.id],
+    }),
 }));
 
 // 5. Relações do Exercício (A peça central)
