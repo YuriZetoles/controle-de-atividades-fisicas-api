@@ -2,7 +2,7 @@ import { DataBase } from "../config/DbConnect";
 import { aluno, treinador } from "../config/db/schema";
 import { auth } from "../utils/auth";
 
-export async function seedUsuarios(academiasIds: number[]): Promise<void> {
+export async function seedUsuarios(academiasIds: string[]): Promise<string[]> {
     if (academiasIds.length === 0) throw new Error("Nenhuma academia encontrada para vincular usuários.");
 
     // Criando usuários de auth (alunos)
@@ -32,7 +32,7 @@ export async function seedUsuarios(academiasIds: number[]): Promise<void> {
     });
 
     // Criando perfis de alunos
-    await DataBase.insert(aluno).values([
+    const alunosCriados = await DataBase.insert(aluno).values([
         {
             user_id: authAluno1.user.id,
             nome: "Carlos Eduardo Silva",
@@ -65,7 +65,7 @@ export async function seedUsuarios(academiasIds: number[]): Promise<void> {
             academia_id: academiasIds[2],
             status_conta: true,
         },
-    ]);
+    ]).returning({ id: aluno.id });
 
     // Criando perfis de treinadores
     await DataBase.insert(treinador).values([
@@ -94,4 +94,6 @@ export async function seedUsuarios(academiasIds: number[]): Promise<void> {
             status_conta: true,
         },
     ]);
+
+    return alunosCriados.map(a => a.id);
 }
