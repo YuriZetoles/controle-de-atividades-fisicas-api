@@ -18,7 +18,8 @@ async function runSeeds() {
             TRUNCATE TABLE 
                 item_rotina, rotina_treino, exercicio_aparelho, exercicio_musculo, 
                 exercicio, aparelho, musculo, treinador_academia, treinador, 
-                avaliacao_fisica, aluno_academia, aluno, academia 
+                avaliacao_fisica, aluno_academia, aluno, academia,
+                session, account, verification, "user"
             CASCADE;
         `);
 

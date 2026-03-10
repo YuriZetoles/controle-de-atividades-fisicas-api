@@ -1,17 +1,14 @@
 import { z } from 'zod';
 
-const studentIdSchema = z.coerce.number().int().positive({ message: "ID deve ser um número inteiro positivo" });
+const alunoIdSchema = z.string().uuid({ message: "ID deve ser um UUID válido" });
 
-const studentSchema = z.object({
+const alunoSchema = z.object({
+    user_id: z
+        .string()
+        .min(1, { message: "O user_id é obrigatório" }),
     nome: z
         .string()
         .min(1, { message: "O nome é obrigatório" }),
-    email: z
-        .string()
-        .min(1, { message: "O email é obrigatório" }),
-    senha: z
-        .string()
-        .min(1, { message: "A senha é obrigatória" }),
     data_nascimento: z
         .string()
         .regex(/^\d{4}-\d{2}-\d{2}$/, { message: "Data de nascimento deve estar no formato YYYY-MM-DD" })
@@ -33,12 +30,11 @@ const studentSchema = z.object({
         .optional()
         .default(true),
     academia_id: z
-        .number()
-        .int({ message: "O ID da academia deve ser um número inteiro" })
-        .positive({ message: "O aluno deve estar vinculado a uma academia válida" }),
+        .string()
+        .uuid({ message: "O ID da academia deve ser um UUID válido" }),
 });
 
-const studentUpdateSchema = studentSchema.partial();
+const alunoUpdateSchema = alunoSchema.partial();
 
 const physicalDataSchema = z.object({
     peso_kg: z
@@ -53,4 +49,4 @@ const physicalDataSchema = z.object({
 
 const physicalDataUpdateSchema = physicalDataSchema.partial();
 
-export { studentIdSchema, studentSchema, studentUpdateSchema, physicalDataSchema, physicalDataUpdateSchema };
+export { alunoIdSchema, alunoSchema, alunoUpdateSchema, physicalDataSchema, physicalDataUpdateSchema };

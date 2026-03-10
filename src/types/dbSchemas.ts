@@ -13,10 +13,9 @@ export type type_academia = {
 
 export type type_aluno = {
     id?: string;
+    user_id: string;
     url_foto?: string | null;
     nome: string;
-    email: string;
-    senha: string;
     data_nascimento: string;
     sexo: enum_sexo;
     is_admin?: boolean;
@@ -35,10 +34,9 @@ export type type_avaliacao_fisica = {
 
 export type type_treinador = {
     id?: string;
+    user_id: string;
     url_foto?: string | null;
     nome: string;
-    email: string;
-    senha: string;
     data_nascimento: string;
     sexo: enum_sexo;
     cref: string;
@@ -113,7 +111,7 @@ export type type_item_rotina = {
     exercicio_id: string;
 }
 
-/* Tipo do usuário autenticado */
+// Tipo do usuário autenticado
 export type type_usuario_autenticado = {
     id: string;
     nome: string;
