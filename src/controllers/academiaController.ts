@@ -57,7 +57,7 @@ class AcademiaController {
     }
 
     getAcademiaById = async (req: Request, res: Response) => {
-        const { id } = req.params;
+        const id = req.params.id as string;
         console.log(`[Controller] id:${id}`)
         if (!id) {
             return CommonResponse.error(res, HttpStatusCode.BAD_REQUEST.code, null, 'id', [], 'O id é obrigatório');
@@ -76,7 +76,7 @@ class AcademiaController {
     }
 
     updateAcademia = async (req: Request, res: Response) => {
-        const { id } = req.params
+        const id = req.params.id as string;
         const academiaEditadaBody = req.body
         if (!id) {
             return CommonResponse.error(res, HttpStatusCode.BAD_REQUEST.code, null, 'id', [], 'O id é obrigatório');
@@ -98,7 +98,7 @@ class AcademiaController {
     }
 
     deleteAcademia = async (req: Request, res: Response) => {
-        const { id } = req.params
+        const id = req.params.id as string;
         if (!id) {
             return CommonResponse.error(res, HttpStatusCode.BAD_REQUEST.code, null, 'id', [], 'O id é obrigatório');
         }

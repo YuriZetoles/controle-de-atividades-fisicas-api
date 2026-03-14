@@ -26,6 +26,8 @@ services:
       NODE_ENV: 'development'
       PORT: '1350'
       TERM: 'xterm'
+      BETTER_AUTH_SECRET: 'chave-secreta-dev-atividades-fisicas'
+      BETTER_AUTH_URL: 'http://localhost:1350'
     ports:
       - 1350:1350
     env_file:
