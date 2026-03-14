@@ -51,6 +51,31 @@ const alunosSeed = [
         },
         academiaIndex: 2,
     },
+    {
+        name: "José Lucas Brandão Montes",
+        email: "lucas.montes@ifro.edu.br",
+        password: "Senha@123",
+        perfil: {
+            nome: "José Lucas Brandão Montes",
+            data_nascimento: "1998-05-15",
+            sexo: "M" as const,
+            is_admin: false,
+            status_conta: true,
+        },
+        academiaIndex: 0,
+    },
+    {
+        name: "Mariana Silva",
+        email: "mariana.silva@email.com",
+        password: "Senha@123",
+        perfil: {
+            nome: "Mariana Silva",
+            data_nascimento: "2000-10-22",
+            sexo: "F" as const,
+            is_admin: false,
+        },
+        academiaIndex: 1,
+    },
 ];
 
 const treinadoresSeed = [
@@ -86,12 +111,28 @@ const treinadoresSeed = [
         },
         academiaIndex: 1,
     },
+    {
+        name: "Paulo Muzy",
+        email: "paulo.muzy@ironberg.com",
+        password: "Senha@123",
+        perfil: {
+            nome: "Paulo Muzy",
+            data_nascimento: "1979-07-16",
+            sexo: "M" as const,
+            cref: "123456-G/SP",
+            turnos: ["MANHA", "TARDE"] as ("MANHA" | "TARDE" | "NOITE")[],
+            especializacao: "Hipertrofia e Emagrecimento",
+            graduacao: "Educação Física - Bacharel",
+            is_admin: false,
+        },
+        academiaIndex: 1,
+    },
 ];
 
 export async function seedUsuarios(academiasIds: string[]): Promise<string[]> {
     if (academiasIds.length === 0) throw new Error("Nenhuma academia encontrada para vincular usuários.");
 
-    // Criando usuários de auth e perfis de alunos
+    // Criar alunos via BetterAuth 
     const alunosValues = [];
     for (const seed of alunosSeed) {
         const authUser = await auth.api.signUpEmail({
@@ -103,10 +144,9 @@ export async function seedUsuarios(academiasIds: string[]): Promise<string[]> {
             ...seed.perfil,
         });
     }
-
     const alunosCriados = await DataBase.insert(aluno).values(alunosValues).returning({ id: aluno.id });
 
-    // Criando usuários de auth e perfis de treinadores
+    // Criar treinadores via BetterAuth
     const treinadoresValues = [];
     for (const seed of treinadoresSeed) {
         const authUser = await auth.api.signUpEmail({
@@ -118,8 +158,8 @@ export async function seedUsuarios(academiasIds: string[]): Promise<string[]> {
             ...seed.perfil,
         });
     }
-
     await DataBase.insert(treinador).values(treinadoresValues);
 
-    return alunosCriados.map(a => a.id);
+    return alunosCriados.map((a) => a.id);
 }
+

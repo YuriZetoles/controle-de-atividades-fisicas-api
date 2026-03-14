@@ -91,20 +91,12 @@ class AcademiaController {
     }
   };
 
-  getAcademiaById = async (req: Request, res: Response) => {
-    console.log("[AcademiaController] [getAcademiaById] Requisição recebida");
-    const id = req.params.id as string;
-    console.log(`[Controller] id:${id}`);
-    if (!id) {
-      return CommonResponse.error(
-        res,
-        HttpStatusCode.BAD_REQUEST.code,
-        null,
-        "id",
-        [],
-        "O id é obrigatório",
-      );
-    }
+    getAcademiaById = async (req: Request, res: Response) => {
+        const id = req.params.id as string;
+        console.log(`[Controller] id:${id}`)
+        if (!id) {
+            return CommonResponse.error(res, HttpStatusCode.BAD_REQUEST.code, null, 'id', [], 'O id é obrigatório');
+        }
 
     console.log(`[Controller] id:${id}`);
     try {
@@ -125,21 +117,12 @@ class AcademiaController {
     }
   };
 
-  updateAcademia = async (req: Request, res: Response) => {
-    console.log("[AcademiaController] [updateAcademia] Requisição recebida");
-    const id = req.params.id as string;
-    console.log(`[Controller] id:${id}`);
-    const academiaEditadaBody = req.body;
-    if (!id) {
-      return CommonResponse.error(
-        res,
-        HttpStatusCode.BAD_REQUEST.code,
-        null,
-        "id",
-        [],
-        "O id é obrigatório",
-      );
-    }
+    updateAcademia = async (req: Request, res: Response) => {
+        const id = req.params.id as string;
+        const academiaEditadaBody = req.body
+        if (!id) {
+            return CommonResponse.error(res, HttpStatusCode.BAD_REQUEST.code, null, 'id', [], 'O id é obrigatório');
+        }
 
     if (!academiaEditadaBody) {
       return CommonResponse.error(
@@ -177,20 +160,11 @@ class AcademiaController {
     }
   };
 
-  deleteAcademia = async (req: Request, res: Response) => {
-    console.log("[AcademiaController] [deleteAcademia] Requisição recebida");
-    const id = req.params.id as string;
-    console.log(`[Controller] id:${id}`);
-    if (!id) {
-      return CommonResponse.error(
-        res,
-        HttpStatusCode.BAD_REQUEST.code,
-        null,
-        "id",
-        [],
-        "O id é obrigatório",
-      );
-    }
+    deleteAcademia = async (req: Request, res: Response) => {
+        const id = req.params.id as string;
+        if (!id) {
+            return CommonResponse.error(res, HttpStatusCode.BAD_REQUEST.code, null, 'id', [], 'O id é obrigatório');
+        }
 
     try {
       const resposta = await this.service.deleteAcademia(id);

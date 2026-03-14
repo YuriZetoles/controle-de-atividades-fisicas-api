@@ -1,22 +1,14 @@
 import { DataBase } from "../config/DbConnect";
-import { eq, and, or, isNull, ilike, sql, inArray, SQL } from "drizzle-orm";
-import { exercicio, exercicio_musculo, musculo } from "../config/db/schema";
+import { eq, and, isNull, inArray, sql } from "drizzle-orm";
+import { exercicio, exercicio_musculo, musculo, aluno, treinador, item_rotina } from "../config/db/schema";
 import { type_exercicio } from "../types/dbSchemas";
+import { ExercicioComMusculos, FiltrosExercicio, MusculoResumo, ResultadoPaginadoExercicio } from "../types/filters";
 import { parseDatabaseError } from "../utils/errors/DatabaseError";
+import ExercicioFilterBuilder from "./filters/ExercicioFilterBuilder";
 
-// Tipos auxiliares
-interface FiltrosExercicio {
-    nome?: string;
-    grupo_muscular?: string;
-    aluno_id?: string;
-}
-
-interface ResultadoPaginado {
-    dados: type_exercicio[];
-    total: number;
-    page: number;
-    limite: number;
-    totalPages: number;
+export interface PerfilUsuario {
+    alunoId: string | null;
+    isAdmin: boolean;
 }
 
 class ExercicioRepository {
@@ -31,13 +23,11 @@ class ExercicioRepository {
     ): Promise<type_exercicio> {
         try {
             const resultado = await this.db.transaction(async (tx) => {
-                // 1) Insere exercício
                 const [exercicioCriado] = await tx
                     .insert(exercicio)
                     .values(novoExercicio)
                     .returning();
 
-                // 2) Insere vínculos N:M com músculos
                 if (musculos.length > 0) {
                     await tx.insert(exercicio_musculo).values(
                         musculos.map((m) => ({
@@ -56,46 +46,22 @@ class ExercicioRepository {
         }
     }
 
-    async listarExercicios(
+    async getAllExercicios(
         filtros: FiltrosExercicio,
         page: number,
         limite: number,
-    ): Promise<ResultadoPaginado> {
+    ): Promise<ResultadoPaginadoExercicio> {
         try {
-            const condicoes: SQL[] = [isNull(exercicio.deletado_em)];
+            const where = new ExercicioFilterBuilder()
+                .comNome(filtros.nome)
+                .comAluno(filtros.aluno_id)
+                .comGrupoMuscular(filtros.grupo_muscular)
+                .comTipoAtivacao(filtros.tipo_ativacao)
+                .build();
 
-            // Filtro por nome
-            if (filtros.nome) {
-                condicoes.push(ilike(exercicio.nome, `%${filtros.nome}%`));
-            }
-
-            // Filtro por aluno_id -> mostra globais + pessoais do aluno
-            if (filtros.aluno_id) {
-                condicoes.push(
-                    or(
-                        isNull(exercicio.aluno_id),
-                        eq(exercicio.aluno_id, filtros.aluno_id),
-                    )!,
-                );
-            } else {
-                condicoes.push(isNull(exercicio.aluno_id));
-            }
-
-            // Filtro por grupo_muscular via subquery (exercícios que possuem ao menos 1 músculo no grupo)
-            if (filtros.grupo_muscular) {
-                const idsExercicios = this.db
-                    .selectDistinct({ id: exercicio_musculo.exercicio_id })
-                    .from(exercicio_musculo)
-                    .innerJoin(musculo, eq(exercicio_musculo.musculo_id, musculo.id))
-                    .where(eq(musculo.grupo_muscular, filtros.grupo_muscular as any));
-
-                condicoes.push(inArray(exercicio.id, idsExercicios));
-            }
-
-            const where = and(...condicoes);
             const offset = (page - 1) * limite;
 
-            const [dados, countResult] = await Promise.all([
+            const [exercicios, countResult] = await Promise.all([
                 this.db
                     .select()
                     .from(exercicio)
@@ -111,11 +77,10 @@ class ExercicioRepository {
 
             const total = Number(countResult[0].count);
 
-            let dadosComMusculos: (type_exercicio & { musculos: any[] })[] = dados.map(e => ({ ...e, musculos: [] }));
-
-            if (dados.length > 0) {
-                const ids = dados.map(e => e.id!);
-                const vinculosMusculos = await this.db
+            let musculos: (MusculoResumo & { exercicio_id: string })[] = [];
+            if (exercicios.length > 0) {
+                const ids = exercicios.map((e) => e.id!);
+                musculos = await this.db
                     .select({
                         exercicio_id: exercicio_musculo.exercicio_id,
                         musculo_id: exercicio_musculo.musculo_id,
@@ -126,34 +91,38 @@ class ExercicioRepository {
                     .from(exercicio_musculo)
                     .innerJoin(musculo, eq(exercicio_musculo.musculo_id, musculo.id))
                     .where(inArray(exercicio_musculo.exercicio_id, ids));
-
-                const musculosPorExercicio = new Map<string, any[]>();
-                for (const vínculo of vinculosMusculos) {
-                    if (!musculosPorExercicio.has(vínculo.exercicio_id)) {
-                        musculosPorExercicio.set(vínculo.exercicio_id, []);
-                    }
-                    musculosPorExercicio.get(vínculo.exercicio_id)!.push(vínculo);
-                }
-
-                dadosComMusculos = dadosComMusculos.map(e => ({
-                    ...e,
-                    musculos: musculosPorExercicio.get(e.id!) ?? [],
-                }));
             }
 
+            const musculosPorExercicio = new Map<string, MusculoResumo[]>();
+            for (const m of musculos) {
+                const lista = musculosPorExercicio.get(m.exercicio_id) ?? [];
+                lista.push({
+                    musculo_id: m.musculo_id,
+                    tipo_ativacao: m.tipo_ativacao as 'PRIMARIO' | 'SECUNDARIO',
+                    nome: m.nome,
+                    grupo_muscular: m.grupo_muscular,
+                });
+                musculosPorExercicio.set(m.exercicio_id, lista);
+            }
+
+            const dados: ExercicioComMusculos[] = exercicios.map((e) => ({
+                ...e,
+                musculos: musculosPorExercicio.get(e.id!) ?? [],
+            }));
+
             return {
-                dados: dadosComMusculos,
+                dados,
                 total,
                 page,
                 limite,
                 totalPages: Math.ceil(total / limite),
             };
         } catch (error) {
-            throw parseDatabaseError(error, 'ExercicioRepository.listarExercicios');
+            throw parseDatabaseError(error, 'ExercicioRepository.getAllExercicios');
         }
     }
 
-    async getExercicioById(id: string): Promise<(type_exercicio & { musculos?: any[] }) | null> {
+    async getByIdExercicio(id: string): Promise<ExercicioComMusculos | null> {
         try {
             const resposta = await this.db
                 .select()
@@ -162,7 +131,6 @@ class ExercicioRepository {
 
             if (!resposta[0]) return null;
 
-            // Busca vínculos de músculos do exercício
             const vinculosMusculos = await this.db
                 .select({
                     musculo_id: exercicio_musculo.musculo_id,
@@ -174,9 +142,15 @@ class ExercicioRepository {
                 .innerJoin(musculo, eq(exercicio_musculo.musculo_id, musculo.id))
                 .where(eq(exercicio_musculo.exercicio_id, id));
 
-            return { ...resposta[0], musculos: vinculosMusculos };
+            return {
+                ...resposta[0],
+                musculos: vinculosMusculos.map((m) => ({
+                    ...m,
+                    tipo_ativacao: m.tipo_ativacao as 'PRIMARIO' | 'SECUNDARIO',
+                })),
+            };
         } catch (error) {
-            throw parseDatabaseError(error, 'ExercicioRepository.getExercicioById');
+            throw parseDatabaseError(error, 'ExercicioRepository.getByIdExercicio');
         }
     }
 
@@ -228,13 +202,91 @@ class ExercicioRepository {
         }
     }
 
+    async softDeleteExercicio(id: string): Promise<type_exercicio> {
+        try {
+            const [resposta] = await this.db
+                .update(exercicio)
+                .set({ deletado_em: new Date() })
+                .where(and(eq(exercicio.id, id), isNull(exercicio.deletado_em)))
+                .returning();
+
+            return resposta;
+        } catch (error) {
+            throw parseDatabaseError(error, 'ExercicioRepository.softDeleteExercicio');
+        }
+    }
+
+    async hardDeleteExercicio(id: string): Promise<void> {
+        try {
+            await this.db.transaction(async (tx) => {
+                await tx.delete(exercicio_musculo).where(eq(exercicio_musculo.exercicio_id, id));
+                await tx.delete(exercicio).where(eq(exercicio.id, id));
+            });
+        } catch (error) {
+            throw parseDatabaseError(error, 'ExercicioRepository.hardDeleteExercicio');
+        }
+    }
+
+    /**
+     * Hard delete em cascata — exclusivo para admin.
+     * Remove item_rotina, exercicio_musculo e exercicio em uma única transação.
+     */
+    async hardDeleteCascade(id: string): Promise<void> {
+        try {
+            await this.db.transaction(async (tx) => {
+                await tx.delete(item_rotina).where(eq(item_rotina.exercicio_id, id));
+                await tx.delete(exercicio_musculo).where(eq(exercicio_musculo.exercicio_id, id));
+                await tx.delete(exercicio).where(eq(exercicio.id, id));
+            });
+        } catch (error) {
+            throw parseDatabaseError(error, 'ExercicioRepository.hardDeleteCascade');
+        }
+    }
+
+    async buscarPerfilDoUsuario(userId: string): Promise<PerfilUsuario> {
+        try {
+            const [alunoResult, treinadorResult] = await Promise.all([
+                this.db
+                    .select({ id: aluno.id, is_admin: aluno.is_admin })
+                    .from(aluno)
+                    .where(eq(aluno.user_id, userId))
+                    .limit(1),
+                this.db
+                    .select({ is_admin: treinador.is_admin })
+                    .from(treinador)
+                    .where(eq(treinador.user_id, userId))
+                    .limit(1),
+            ]);
+
+            const isAdmin =
+                (alunoResult[0]?.is_admin === true) ||
+                (treinadorResult[0]?.is_admin === true);
+
+            return {
+                alunoId: alunoResult[0]?.id ?? null,
+                isAdmin,
+            };
+        } catch (error) {
+            throw parseDatabaseError(error, 'ExercicioRepository.buscarPerfilDoUsuario');
+        }
+    }
+
+    async isUserAdmin(userId: string): Promise<boolean> {
+        try {
+            const perfil = await this.buscarPerfilDoUsuario(userId);
+            return perfil.isAdmin;
+        } catch (error) {
+            throw parseDatabaseError(error, 'ExercicioRepository.isUserAdmin');
+        }
+    }
+
     async findByNome(nome: string, alunoId?: string | null): Promise<type_exercicio | null> {
         try {
-            const condicoes = alunoId
+            const where = alunoId
                 ? and(
                     eq(exercicio.nome, nome),
                     isNull(exercicio.deletado_em),
-                    or(isNull(exercicio.aluno_id), eq(exercicio.aluno_id, alunoId)),
+                    sql`(${exercicio.aluno_id} IS NULL OR ${exercicio.aluno_id} = ${alunoId})`,
                 )
                 : and(
                     eq(exercicio.nome, nome),
@@ -242,10 +294,56 @@ class ExercicioRepository {
                     isNull(exercicio.aluno_id),
                 );
 
-            const resposta = await this.db.select().from(exercicio).where(condicoes);
+            const resposta = await this.db.select().from(exercicio).where(where);
             return resposta[0] || null;
         } catch (error) {
             throw parseDatabaseError(error, 'ExercicioRepository.findByNome');
+        }
+    }
+
+    async verificarAlunoExiste(alunoId: string): Promise<boolean> {
+        try {
+            const resultado = await this.db
+                .select({ id: aluno.id })
+                .from(aluno)
+                .where(eq(aluno.id, alunoId))
+                .limit(1);
+
+            return resultado.length > 0;
+        } catch (error) {
+            throw parseDatabaseError(error, 'ExercicioRepository.verificarAlunoExiste');
+        }
+    }
+
+    async verificarMusculosExistem(musculoIds: string[]): Promise<{ validos: boolean; inexistentes: string[] }> {
+        try {
+            const encontrados = await this.db
+                .select({ id: musculo.id })
+                .from(musculo)
+                .where(sql`${musculo.id} IN ${musculoIds}`);
+
+            const idsEncontrados = new Set(encontrados.map((m) => m.id));
+            const inexistentes = musculoIds.filter((id) => !idsEncontrados.has(id));
+
+            return {
+                validos: inexistentes.length === 0,
+                inexistentes,
+            };
+        } catch (error) {
+            throw parseDatabaseError(error, 'ExercicioRepository.verificarMusculosExistem');
+        }
+    }
+
+    async contarReferenciasEmRotina(exercicioId: string): Promise<number> {
+        try {
+            const resultado = await this.db
+                .select({ count: sql<number>`count(*)` })
+                .from(item_rotina)
+                .where(eq(item_rotina.exercicio_id, exercicioId));
+
+            return Number(resultado[0].count);
+        } catch (error) {
+            throw parseDatabaseError(error, 'ExercicioRepository.contarReferenciasEmRotina');
         }
     }
 }

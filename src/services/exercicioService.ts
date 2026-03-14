@@ -7,21 +7,7 @@ import {
     exercicioQuerySchema,
     exercicioIdSchema,
 } from "../utils/validations/exercicioValidation";
-
-// Tipos auxiliares
-interface FiltrosExercicio {
-    nome?: string;
-    grupo_muscular?: string;
-    aluno_id?: string;
-}
-
-interface ResultadoPaginado {
-    dados: type_exercicio[];
-    total: number;
-    page: number;
-    limite: number;
-    totalPages: number;
-}
+import { ExercicioComMusculos, FiltrosExercicio, ResultadoPaginadoExercicio } from "../types/filters";
 
 class ExercicioService {
     private repository: ExercicioRepository;
@@ -30,11 +16,37 @@ class ExercicioService {
         this.repository = new ExercicioRepository();
     }
 
-    async createExercicio(body: any): Promise<type_exercicio> {
+    async createExercicio(body: any, userId: string): Promise<ExercicioComMusculos> {
         try {
             const dadosValidados = exercicioSchema.parse(body);
 
-            // Verificar duplicidade de nome na base global OU na base privada do aluno
+            const perfil = await this.repository.buscarPerfilDoUsuario(userId);
+
+            if (!dadosValidados.aluno_id && !perfil.isAdmin) {
+                throw new Error('FORBIDDEN: apenas administradores podem criar exercícios globais');
+            }
+
+            if (dadosValidados.aluno_id) {
+                const alunoExiste = await this.repository.verificarAlunoExiste(dadosValidados.aluno_id);
+                if (!alunoExiste) {
+                    throw new Error('Aluno não encontrado');
+                }
+
+                // Usuário não-admin só pode criar exercícios para si mesmo
+                if (!perfil.isAdmin && perfil.alunoId !== dadosValidados.aluno_id) {
+                    throw new Error('FORBIDDEN: você não pode criar exercícios para outro aluno');
+                }
+            }
+
+            const verificacaoMusculos = await this.repository.verificarMusculosExistem(
+                dadosValidados.musculos.map((m) => m.musculo_id),
+            );
+            if (!verificacaoMusculos.validos) {
+                throw new Error(
+                    `Músculo(s) não encontrado(s): ${verificacaoMusculos.inexistentes.join(', ')}`,
+                );
+            }
+
             const exercicioExistente = await this.repository.findByNome(
                 dadosValidados.nome,
                 dadosValidados.aluno_id,
@@ -55,71 +67,93 @@ class ExercicioService {
                 dadosValidados.musculos,
             );
 
-            // Retorna o exercício com músculos associados
-            return await this.repository.getExercicioById(exercicioCriado.id!) as type_exercicio;
+            return await this.repository.getByIdExercicio(exercicioCriado.id!) as ExercicioComMusculos;
         } catch (error) {
             if (error instanceof ZodError) {
                 console.warn('[ExercicioService] [createExercicio] Falha na validação Zod:', error.issues);
-            } else {
-                console.warn('[ExercicioService] [createExercicio] Erro recebido, propagando...');
             }
             throw error;
         }
     }
 
-    async listarExercicios(query: any): Promise<ResultadoPaginado> {
+    async getAllExercicios(query: any, userId: string): Promise<ResultadoPaginadoExercicio> {
         try {
             const { page, limite, nome, grupo_muscular, aluno_id } = exercicioQuerySchema.parse(query);
+
+            if (aluno_id) {
+                const perfil = await this.repository.buscarPerfilDoUsuario(userId);
+                if (!perfil.isAdmin && perfil.alunoId !== aluno_id) {
+                    throw new Error('FORBIDDEN: você não pode listar exercícios de outro aluno');
+                }
+            }
 
             const filtros: FiltrosExercicio = {};
             if (nome) filtros.nome = nome;
             if (grupo_muscular) filtros.grupo_muscular = grupo_muscular;
             if (aluno_id) filtros.aluno_id = aluno_id;
 
-            return await this.repository.listarExercicios(filtros, page, limite);
+            return await this.repository.getAllExercicios(filtros, page, limite);
         } catch (error) {
             if (error instanceof ZodError) {
-                console.warn('[ExercicioService] [listarExercicios] Falha na validação Zod:', error.issues);
+                console.warn('[ExercicioService] [getAllExercicios] Falha na validação Zod:', error.issues);
             }
             throw error;
         }
     }
 
-    async getExercicioById(idParam: string): Promise<type_exercicio> {
+    async getByIdExercicio(idParam: string, userId: string): Promise<ExercicioComMusculos> {
         const id = exercicioIdSchema.parse(idParam);
 
-        try {
-            const exercicioEncontrado = await this.repository.getExercicioById(id);
+        const exercicioEncontrado = await this.repository.getByIdExercicio(id);
 
-            if (!exercicioEncontrado) {
-                throw new Error('Exercício não encontrado');
-            }
-
-            // TODO: [AUTH] Quando implementado, validar se o usuário tem permissão:
-            // - Exercício global (aluno_id = NULL): qualquer usuário autenticado pode visualizar
-            // - Exercício pessoal: apenas o dono (aluno_id === usuarioLogadoId) ou ADMIN pode visualizar
-
-            return exercicioEncontrado;
-        } catch (error) {
-            throw error;
+        if (!exercicioEncontrado) {
+            throw new Error('Exercício não encontrado');
         }
+
+        // Exercício pessoal: apenas o dono ou admin pode visualizar
+        if (exercicioEncontrado.aluno_id) {
+            const perfil = await this.repository.buscarPerfilDoUsuario(userId);
+            if (!perfil.isAdmin && perfil.alunoId !== exercicioEncontrado.aluno_id) {
+                throw new Error('FORBIDDEN: você não tem permissão para visualizar este exercício');
+            }
+        }
+
+        return exercicioEncontrado;
     }
 
-    async updateExercicio(idParam: string, body: any): Promise<type_exercicio> {
+    async updateExercicio(idParam: string, body: any, userId: string): Promise<ExercicioComMusculos> {
         try {
             const id = exercicioIdSchema.parse(idParam);
             const dadosValidados = exercicioUpdateSchema.parse(body);
 
-            // Verificar se exercício existe
-            const exercicioExistente = await this.repository.getExercicioById(id);
+            const exercicioExistente = await this.repository.getByIdExercicio(id);
 
             if (!exercicioExistente) {
                 throw new Error('Exercício não encontrado');
             }
 
-            // TODO: [AUTH] Implementar verificação de permissão por perfil:
-            // - ADMIN: pode editar qualquer exercício (global ou pessoal)
-            // - INSTRUTOR/ALUNO: só pode editar exercícios pessoais onde aluno_id === usuarioLogadoId
+            const perfil = await this.repository.buscarPerfilDoUsuario(userId);
+
+            // Exercício global: apenas admin pode editar
+            if (!exercicioExistente.aluno_id && !perfil.isAdmin) {
+                throw new Error('FORBIDDEN: apenas administradores podem editar exercícios globais');
+            }
+
+            // Exercício pessoal: apenas o dono ou admin pode editar
+            if (exercicioExistente.aluno_id && !perfil.isAdmin && perfil.alunoId !== exercicioExistente.aluno_id) {
+                throw new Error('FORBIDDEN: você não tem permissão para editar este exercício');
+            }
+
+            if (dadosValidados.musculos && dadosValidados.musculos.length > 0) {
+                const verificacaoMusculos = await this.repository.verificarMusculosExistem(
+                    dadosValidados.musculos.map((m) => m.musculo_id),
+                );
+                if (!verificacaoMusculos.validos) {
+                    throw new Error(
+                        `Músculo(s) não encontrado(s): ${verificacaoMusculos.inexistentes.join(', ')}`,
+                    );
+                }
+            }
 
             if (dadosValidados.nome && dadosValidados.nome !== exercicioExistente.nome) {
                 const duplicado = await this.repository.findByNome(
@@ -139,15 +173,68 @@ class ExercicioService {
 
             await this.repository.updateExercicio(id, dadosParaAtualizar, musculos);
 
-            return await this.repository.getExercicioById(id) as type_exercicio;
+            return await this.repository.getByIdExercicio(id) as ExercicioComMusculos;
         } catch (error) {
             if (error instanceof ZodError) {
                 console.warn('[ExercicioService] [updateExercicio] Falha na validação Zod:', error.issues);
-            } else {
-                console.warn('[ExercicioService] [updateExercicio] Erro recebido, propagando...');
             }
             throw error;
         }
+    }
+
+    async deleteExercicio(
+        idParam: string,
+        options: { soft?: boolean; force?: boolean; userId: string },
+    ): Promise<{ exercicio: type_exercicio; tipo_exclusao: 'soft' | 'hard' | 'cascade' }> {
+        const id = exercicioIdSchema.parse(idParam);
+        const { soft = false, force = false, userId } = options;
+
+        const exercicioExistente = await this.repository.getByIdExercicio(id);
+        if (!exercicioExistente) {
+            throw new Error('Exercício não encontrado');
+        }
+
+        const perfil = await this.repository.buscarPerfilDoUsuario(userId);
+
+        // Exercício global: apenas admin pode deletar
+        if (!exercicioExistente.aluno_id && !perfil.isAdmin) {
+            throw new Error('FORBIDDEN: apenas administradores podem excluir exercícios globais');
+        }
+
+        // Exercício pessoal: apenas o dono ou admin pode deletar
+        if (exercicioExistente.aluno_id && !perfil.isAdmin && perfil.alunoId !== exercicioExistente.aluno_id) {
+            throw new Error('FORBIDDEN: você não tem permissão para excluir este exercício');
+        }
+
+        const totalReferencias = await this.repository.contarReferenciasEmRotina(id);
+
+        // Sem referências = hard delete direto
+        if (totalReferencias === 0) {
+            await this.repository.hardDeleteExercicio(id);
+            return { exercicio: exercicioExistente, tipo_exclusao: 'hard' };
+        }
+
+        // Tem referências + ?soft=true = soft delete
+        if (soft) {
+            const exercicioDesativado = await this.repository.softDeleteExercicio(id);
+            return { exercicio: exercicioDesativado, tipo_exclusao: 'soft' };
+        }
+
+        // Tem referências + ?force=true = hard delete em cascata, apenas admin
+        if (force) {
+            if (!perfil.isAdmin) {
+                throw new Error('FORBIDDEN: apenas administradores podem forçar a exclusão de exercícios em uso');
+            }
+            await this.repository.hardDeleteCascade(id);
+            return { exercicio: exercicioExistente, tipo_exclusao: 'cascade' };
+        }
+
+        // Tem referências, sem parâmetro = 409 orientando o cliente
+        throw new Error(
+            `Exercício está vinculado a ${totalReferencias} rotina(s) de treino. ` +
+            `Use ?soft=true para desativá-lo sem remover as rotinas, ` +
+            `ou ?force=true (requer admin) para excluir permanentemente junto com as rotinas.`,
+        );
     }
 }
 
