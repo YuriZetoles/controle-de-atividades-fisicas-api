@@ -5,6 +5,7 @@ import chalk from 'chalk';
 import { seedAcademias } from './academiaSeeds';
 import { seedUsuarios } from './usuarioSeeds';
 import { seedExercicios, seedExerciciosPessoais } from './exercicioSeeds';
+import { seedTreinos } from './treinoSeeds';
 
 async function runSeeds() {
     try {
@@ -36,6 +37,9 @@ async function runSeeds() {
 
         console.log(chalk.cyanBright(`※ ${chalk.cyan('Exercícios Pessoais...')}`));
         await seedExerciciosPessoais(alunoIds);
+
+        console.log(chalk.cyanBright(`※ ${chalk.cyan('Treinos e Itens de Treino...')}`));
+        await seedTreinos();
 
         console.log(chalk.greenBright('Seeds executados com sucesso!'));
         process.exit(0);

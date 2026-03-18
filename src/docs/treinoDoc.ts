@@ -1,6 +1,10 @@
 import { OpenAPIRegistry } from '@asteasolutions/zod-to-openapi';
 import { z } from 'zod';
-import { treinoSchema } from '../utils/validations/treinoValidation';
+import {
+    treinoSchema,
+    treinoDetalheQuerySchema,
+    treinoListQuerySchema,
+} from '../utils/validations/treinoValidation';
 
 export const treinoRegistry = new OpenAPIRegistry();
 
@@ -9,9 +13,55 @@ const TreinoResponse = z.object({
     nome: z.string().openapi({ example: 'Treino A - Peito e Tríceps' }),
     descricao: z.string().nullable().openapi({ example: 'Treino focado em membros superiores' }),
     data_criacao: z.coerce.date().openapi({ example: '2026-03-17T10:00:00.000Z' }),
+    deletado_em: z.coerce.date().nullable().openapi({ example: null }),
     usuario_id: z.string().uuid().openapi({ example: '550e8400-e29b-41d4-a716-446655440000' }),
     treinador_id: z.string().uuid().nullable().openapi({ example: '550e8400-e29b-41d4-a716-446655440002' }),
 }).openapi('Treino');
+
+const TreinoIdParam = z.object({
+    id: z.string().uuid().openapi({ description: 'UUID do treino', example: '550e8400-e29b-41d4-a716-446655440010' }),
+});
+
+const TreinoExercicioResponse = z.object({
+    id: z.string().uuid().openapi({ example: '550e8400-e29b-41d4-a716-446655440020' }),
+    series: z.number().openapi({ example: 4 }),
+    repeticoes: z.string().openapi({ example: '8-12' }),
+    carga_sugerida: z.string().nullable().openapi({ example: '30.00' }),
+    tempo_descanso_segundos: z.number().openapi({ example: 90 }),
+    ordem_execucao: z.number().openapi({ example: 1 }),
+    exercicio: z.object({
+        id: z.string().uuid().openapi({ example: '550e8400-e29b-41d4-a716-446655440030' }),
+        nome: z.string().openapi({ example: 'Supino Reto' }),
+        descricao: z.string().nullable().openapi({ example: 'Exercício para peitorais' }),
+        musculos: z.array(
+            z.object({
+                musculo_id: z.string().uuid().openapi({ example: '550e8400-e29b-41d4-a716-446655440040' }),
+                nome: z.string().openapi({ example: 'Peitoral Maior' }),
+                grupo_muscular: z.string().openapi({ example: 'PEITO' }),
+                tipo_ativacao: z.enum(['PRIMARIO', 'SECUNDARIO']).openapi({ example: 'PRIMARIO' }),
+            }),
+        ).optional(),
+        aparelhos: z.array(
+            z.object({
+                aparelho_id: z.string().uuid().openapi({ example: '550e8400-e29b-41d4-a716-446655440050' }),
+                nome: z.string().openapi({ example: 'Banco Reto' }),
+                descricao: z.string().openapi({ example: 'Banco de apoio para supino' }),
+            }),
+        ).optional(),
+    }),
+});
+
+const TreinoDetalhadoResponse = TreinoResponse.extend({
+    exercicios: z.array(TreinoExercicioResponse),
+});
+
+const TreinoListResponse = z.object({
+    dados: z.array(z.union([TreinoResponse, TreinoDetalhadoResponse])),
+    total: z.number().openapi({ example: 12 }),
+    page: z.number().openapi({ example: 1 }),
+    limite: z.number().openapi({ example: 10 }),
+    totalPages: z.number().openapi({ example: 2 }),
+});
 
 // POST /treinos
 treinoRegistry.registerPath({
@@ -48,5 +98,71 @@ treinoRegistry.registerPath({
         403: { description: 'Sem permissão para criar treino para outro aluno' },
         404: { description: 'Aluno não encontrado' },
         422: { description: 'Erro de validação' },
+    },
+});
+
+// GET /treinos/{id}
+treinoRegistry.registerPath({
+    method: 'get',
+    path: '/treinos/{id}',
+    summary: 'Buscar treino por ID',
+    description: 'Retorna um treino com seus exercícios e permite filtros por nome/grupo muscular/tipo de ativação, ordenação por ordem_execucao e populates opcionais de músculos e aparelhos. Acesso permitido ao aluno dono, treinador vinculado ao treino ou admin.',
+    tags: ['Treino'],
+    security: [{ BearerAuth: [] }],
+    request: {
+        params: TreinoIdParam,
+        query: treinoDetalheQuerySchema,
+    },
+    responses: {
+        200: {
+            description: 'Treino encontrado',
+            content: {
+                'application/json': {
+                    schema: z.object({
+                        error: z.boolean().openapi({ example: false }),
+                        code: z.number().openapi({ example: 200 }),
+                        message: z.string().nullable(),
+                        data: TreinoDetalhadoResponse,
+                        errors: z.array(z.any()),
+                    }),
+                },
+            },
+        },
+        401: { description: 'Não autorizado' },
+        403: { description: 'Sem permissão para visualizar este treino' },
+        404: { description: 'Treino não encontrado' },
+        422: { description: 'ID inválido' },
+    },
+});
+
+// GET /treinos
+treinoRegistry.registerPath({
+    method: 'get',
+    path: '/treinos',
+    summary: 'Listar treinos',
+    description: 'Lista treinos com paginação e filtros por nome, aluno e treinador. Filtros de exercício (nome_exercicio, grupo_muscular, tipo_ativacao) restringem os próprios treinos retornados para apenas os que possuem match. Suporta incluir exercícios e populates opcionais de músculos/aparelhos para cenários de dashboard e acompanhamento no app.',
+    tags: ['Treino'],
+    security: [{ BearerAuth: [] }],
+    request: {
+        query: treinoListQuerySchema,
+    },
+    responses: {
+        200: {
+            description: 'Lista paginada de treinos',
+            content: {
+                'application/json': {
+                    schema: z.object({
+                        error: z.boolean().openapi({ example: false }),
+                        code: z.number().openapi({ example: 200 }),
+                        message: z.string().nullable(),
+                        data: TreinoListResponse,
+                        errors: z.array(z.any()),
+                    }),
+                },
+            },
+        },
+        401: { description: 'Não autorizado' },
+        403: { description: 'Sem permissão para listar treinos com os filtros informados' },
+        422: { description: 'Parâmetros de query inválidos' },
     },
 });
