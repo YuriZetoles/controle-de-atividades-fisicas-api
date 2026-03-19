@@ -8,5 +8,6 @@ const treinoController = new TreinoController();
 router.post('/treinos', authMiddleware, treinoController.createTreino);
 router.get('/treinos', authMiddleware, treinoController.getAllTreinos);
 router.get('/treinos/:id', authMiddleware, treinoController.getTreinoById);
+router.patch('/treinos/:id', authMiddleware, treinoController.updateTreino);
 
 export default router;

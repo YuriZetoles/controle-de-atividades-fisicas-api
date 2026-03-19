@@ -10,7 +10,7 @@ import {
     exercicio_aparelho,
     aparelho,
 } from '../config/db/schema';
-import { and, asc, desc, eq, inArray, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, isNull, sql } from 'drizzle-orm';
 import { type_treino } from '../types/dbSchemas';
 import { parseDatabaseError } from '../utils/errors/DatabaseError';
 import TreinoFilterBuilder from './filters/TreinoFilterBuilder';
@@ -61,6 +61,21 @@ export interface ResultadoPaginadoTreino {
     totalPages: number;
 }
 
+export interface TreinoExercicioPatchInput {
+    exercicio_id: string;
+    series: number;
+    repeticoes: string;
+    carga_sugerida?: number | string | null;
+    tempo_descanso_segundos: number;
+    ordem_execucao: number;
+}
+
+export interface ExercicioResumo {
+    id: string;
+    aluno_id: string | null;
+    deletado_em: Date | null;
+}
+
 class TreinoRepository {
     private db: typeof DataBase;
 
@@ -78,6 +93,52 @@ class TreinoRepository {
             return resultado as type_treino;
         } catch (error) {
             throw parseDatabaseError(error, 'TreinoRepository.create');
+        }
+    }
+
+    async createComExercicios(novoTreino: type_treino, itens: TreinoExercicioPatchInput[]): Promise<type_treino> {
+        try {
+            const treinoCriado = await this.db.transaction(async (tx) => {
+                const [treinoInserido] = await tx
+                    .insert(treino)
+                    .values(novoTreino)
+                    .returning();
+
+                await tx.insert(treino_exercicio).values(
+                    itens.map((item) => ({
+                        treino_id: treinoInserido.id,
+                        exercicio_id: item.exercicio_id,
+                        series: item.series,
+                        repeticoes: item.repeticoes,
+                        carga_sugerida:
+                            item.carga_sugerida === null || item.carga_sugerida === undefined
+                                ? null
+                                : String(item.carga_sugerida),
+                        tempo_descanso_segundos: item.tempo_descanso_segundos,
+                        ordem_execucao: item.ordem_execucao,
+                    })),
+                );
+
+                return treinoInserido as type_treino;
+            });
+
+            return treinoCriado;
+        } catch (error) {
+            throw parseDatabaseError(error, 'TreinoRepository.createComExercicios');
+        }
+    }
+
+    async findBaseById(id: string): Promise<type_treino | null> {
+        try {
+            const [treinoBase] = await this.db
+                .select()
+                .from(treino)
+                .where(and(eq(treino.id, id), isNull(treino.deletado_em)))
+                .limit(1);
+
+            return treinoBase ?? null;
+        } catch (error) {
+            throw parseDatabaseError(error, 'TreinoRepository.findBaseById');
         }
     }
 
@@ -243,15 +304,7 @@ class TreinoRepository {
 
     async findById(id: string, filtros: TreinoDetalheQuery): Promise<TreinoComExercicios | null> {
         try {
-            const filterBuilder = new TreinoFilterBuilder()
-                .comTreinoId(id)
-                .apenasTreinosAtivos();
-
-            const [treinoEncontrado] = await this.db
-                .select()
-                .from(treino)
-                .where(filterBuilder.buildTreino())
-                .limit(1);
+            const treinoEncontrado = await this.findBaseById(id);
 
             if (!treinoEncontrado) {
                 return null;
@@ -353,6 +406,102 @@ class TreinoRepository {
             };
         } catch (error) {
             throw parseDatabaseError(error, 'TreinoRepository.findAll');
+        }
+    }
+    async update(id: string, treinoData: Partial<Pick<type_treino, 'nome' | 'descricao'>>): Promise<type_treino | null> {
+        try {
+            const [treinoAtualizado] = await this.db
+                .update(treino)
+                .set(treinoData)
+                .where(and(eq(treino.id, id), isNull(treino.deletado_em)))
+                .returning();
+
+            return treinoAtualizado ?? null;
+        } catch (error) {
+            throw parseDatabaseError(error, 'TreinoRepository.update');
+        }
+    }
+
+    async findExerciciosByIds(ids: string[]): Promise<ExercicioResumo[]> {
+        try {
+            if (ids.length === 0) {
+                return [];
+            }
+
+            const exercicios = await this.db
+                .select({
+                    id: exercicio.id,
+                    aluno_id: exercicio.aluno_id,
+                    deletado_em: exercicio.deletado_em,
+                })
+                .from(exercicio)
+                .where(inArray(exercicio.id, ids));
+
+            return exercicios;
+        } catch (error) {
+            throw parseDatabaseError(error, 'TreinoRepository.findExerciciosByIds');
+        }
+    }
+
+    async findTreinoExercicioIdsByTreino(treinoId: string, treinoExercicioIds: string[]): Promise<string[]> {
+        try {
+            if (treinoExercicioIds.length === 0) {
+                return [];
+            }
+
+            const itens = await this.db
+                .select({ id: treino_exercicio.id })
+                .from(treino_exercicio)
+                .where(and(
+                    eq(treino_exercicio.treino_id, treinoId),
+                    inArray(treino_exercicio.id, treinoExercicioIds),
+                ));
+
+            return itens.map((item) => item.id);
+        } catch (error) {
+            throw parseDatabaseError(error, 'TreinoRepository.findTreinoExercicioIdsByTreino');
+        }
+    }
+
+    async addExerciciosAoTreino(treinoId: string, itens: TreinoExercicioPatchInput[]): Promise<void> {
+        try {
+            if (itens.length === 0) {
+                return;
+            }
+
+            await this.db.insert(treino_exercicio).values(
+                itens.map((item) => ({
+                    treino_id: treinoId,
+                    exercicio_id: item.exercicio_id,
+                    series: item.series,
+                    repeticoes: item.repeticoes,
+                    carga_sugerida:
+                        item.carga_sugerida === null || item.carga_sugerida === undefined
+                            ? null
+                            : String(item.carga_sugerida),
+                    tempo_descanso_segundos: item.tempo_descanso_segundos,
+                    ordem_execucao: item.ordem_execucao,
+                })),
+            );
+        } catch (error) {
+            throw parseDatabaseError(error, 'TreinoRepository.addExerciciosAoTreino');
+        }
+    }
+
+    async removeExerciciosDoTreino(treinoId: string, treinoExercicioIds: string[]): Promise<void> {
+        try {
+            if (treinoExercicioIds.length === 0) {
+                return;
+            }
+
+            await this.db
+                .delete(treino_exercicio)
+                .where(and(
+                    eq(treino_exercicio.treino_id, treinoId),
+                    inArray(treino_exercicio.id, treinoExercicioIds),
+                ));
+        } catch (error) {
+            throw parseDatabaseError(error, 'TreinoRepository.removeExerciciosDoTreino');
         }
     }
 }
