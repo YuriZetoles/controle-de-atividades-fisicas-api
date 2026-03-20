@@ -1,7 +1,12 @@
 import { ZodError } from 'zod';
-import TreinoRepository, { ResultadoPaginadoTreino, TreinoComExercicios } from '../repositories/treinoRepository';
+import TreinoRepository, {
+    ResultadoPaginadoTreino,
+    TreinoComExercicios,
+    TreinoExercicioPatchInput,
+} from '../repositories/treinoRepository';
 import {
     treinoSchema,
+    treinoUpdateSchema,
     treinoIdSchema,
     treinoDetalheQuerySchema,
     treinoListQuerySchema,
@@ -15,7 +20,53 @@ class TreinoService {
         this.repository = new TreinoRepository();
     }
 
-    async createTreino(body: unknown, userId: string): Promise<type_treino> {
+    private async validarExerciciosParaVinculo(
+        itens: TreinoExercicioPatchInput[],
+        perfil: Awaited<ReturnType<TreinoRepository['buscarPerfilAcesso']>>,
+        alunoIdDonoDoTreino: string,
+    ): Promise<void> {
+        if (itens.length === 0) {
+            return;
+        }
+
+        const exercicioIdsUnicos = Array.from(new Set(itens.map((item) => item.exercicio_id)));
+        const exerciciosEncontrados = await this.repository.findExerciciosByIds(exercicioIdsUnicos);
+
+        if (exerciciosEncontrados.length !== exercicioIdsUnicos.length) {
+            throw new Error('VALIDATION: um ou mais exercícios informados não existem');
+        }
+
+        const exerciciosInvalidos = exerciciosEncontrados.filter((item) => item.deletado_em !== null);
+        if (exerciciosInvalidos.length > 0) {
+            throw new Error('VALIDATION: não é permitido adicionar exercício inativo ao treino');
+        }
+
+        const exerciciosSemPermissao = exerciciosEncontrados.filter((item) => {
+            if (item.aluno_id === null) {
+                return false;
+            }
+
+            if (perfil.isAdmin) {
+                return false;
+            }
+
+            if (perfil.alunoId && item.aluno_id === perfil.alunoId) {
+                return false;
+            }
+
+            if (perfil.isTreinador && item.aluno_id === alunoIdDonoDoTreino) {
+                return false;
+            }
+
+            return true;
+        });
+
+        if (exerciciosSemPermissao.length > 0) {
+            throw new Error('FORBIDDEN: você não tem permissão para usar um ou mais exercícios informados');
+        }
+    }
+
+    async createTreino(body: unknown, userId: string): Promise<TreinoComExercicios> {
         try {
             const dadosValidados = treinoSchema.parse(body);
             const perfil = await this.repository.buscarPerfilAcesso(userId);
@@ -55,7 +106,24 @@ class TreinoService {
                 treinador_id: perfil.treinadorId,
             };
 
-            return await this.repository.create(novoTreino);
+            const exerciciosIniciais = (dadosValidados.exercicios ?? []) as TreinoExercicioPatchInput[];
+
+            await this.validarExerciciosParaVinculo(exerciciosIniciais, perfil, alunoIdDestino);
+
+            const treinoCriado = exerciciosIniciais.length > 0
+                ? await this.repository.createComExercicios(novoTreino, exerciciosIniciais)
+                : await this.repository.create(novoTreino);
+
+            const treinoDetalhado = await this.repository.findById(
+                treinoCriado.id as string,
+                treinoDetalheQuerySchema.parse({}),
+            );
+
+            if (!treinoDetalhado) {
+                throw new Error('Treino não encontrado');
+            }
+
+            return treinoDetalhado;
         } catch (error) {
             if (error instanceof ZodError) {
                 console.warn('[TreinoService] [createTreino] Falha na validação Zod:', error.issues);
@@ -134,6 +202,128 @@ class TreinoService {
         });
 
         return this.repository.findAll(filtrosLista, filtrosDetalhe);
+    }
+
+    async updateTreino(idParam: string, body: unknown, userId: string): Promise<TreinoComExercicios> {
+        const id = treinoIdSchema.parse(idParam);
+        const dadosValidados = treinoUpdateSchema.parse(body);
+        const perfil = await this.repository.buscarPerfilAcesso(userId);
+
+        if (!perfil.isAluno && !perfil.isTreinador && !perfil.isAdmin) {
+            throw new Error('FORBIDDEN: usuário sem perfil para atualizar treinos');
+        }
+
+        const treinoAtual = await this.repository.findBaseById(id);
+
+        if (!treinoAtual) {
+            throw new Error('Treino não encontrado');
+        }
+
+        const podeAtualizar =
+            perfil.isAdmin ||
+            perfil.alunoId === treinoAtual.usuario_id ||
+            (perfil.treinadorId !== null && perfil.treinadorId === treinoAtual.treinador_id);
+
+        if (!podeAtualizar) {
+            throw new Error('FORBIDDEN: você não tem permissão para atualizar este treino');
+        }
+
+        const adicionarExercicios = (dadosValidados.adicionar_exercicios ?? []) as TreinoExercicioPatchInput[];
+        const removerExerciciosIds = dadosValidados.remover_exercicios_ids ?? [];
+        let idsResolvidosParaRemocao: string[] = [];
+
+        const precisaEstadoAtualTreino = removerExerciciosIds.length > 0 || adicionarExercicios.length > 0;
+        const treinoDetalhadoAtual = precisaEstadoAtualTreino
+            ? await this.repository.findById(
+                id,
+                treinoDetalheQuerySchema.parse({ apenas_ativos: false }),
+            )
+            : null;
+
+        if (precisaEstadoAtualTreino && !treinoDetalhadoAtual) {
+            throw new Error('Treino não encontrado');
+        }
+
+        await this.validarExerciciosParaVinculo(adicionarExercicios, perfil, treinoAtual.usuario_id);
+
+        if (removerExerciciosIds.length > 0) {
+            const idsSolicitadosUnicos = Array.from(new Set(removerExerciciosIds));
+            const idsItemDoTreino = new Set(treinoDetalhadoAtual!.exercicios.map((item) => item.id));
+
+            const itensPorExercicioId = treinoDetalhadoAtual!.exercicios.reduce(
+                (acc, item) => {
+                    const lista = acc.get(item.exercicio.id) ?? [];
+                    lista.push(item.id);
+                    acc.set(item.exercicio.id, lista);
+                    return acc;
+                },
+                new Map<string, string[]>(),
+            );
+
+            const idsRemocao = new Set<string>();
+
+            for (const idSolicitado of idsSolicitadosUnicos) {
+                if (idsItemDoTreino.has(idSolicitado)) {
+                    idsRemocao.add(idSolicitado);
+                    continue;
+                }
+
+                const itensDoExercicio = itensPorExercicioId.get(idSolicitado);
+                if (itensDoExercicio && itensDoExercicio.length > 0) {
+                    itensDoExercicio.forEach((idItem) => idsRemocao.add(idItem));
+                    continue;
+                }
+
+                throw new Error('VALIDATION: um ou mais itens informados para remoção não pertencem a este treino');
+            }
+
+            idsResolvidosParaRemocao = Array.from(idsRemocao);
+        }
+
+        if (adicionarExercicios.length > 0) {
+            const idsRemovidos = new Set(idsResolvidosParaRemocao);
+            const ordensMantidas = new Set(
+                treinoDetalhadoAtual!.exercicios
+                    .filter((item) => !idsRemovidos.has(item.id))
+                    .map((item) => item.ordem_execucao),
+            );
+
+            const conflitoOrdem = adicionarExercicios.some((item) => ordensMantidas.has(item.ordem_execucao));
+            if (conflitoOrdem) {
+                throw new Error('VALIDATION: ordem_execucao já utilizada por outro item do treino');
+            }
+        }
+
+        const payloadAtualizacao: Partial<Pick<type_treino, 'nome' | 'descricao'>> = {};
+        if (dadosValidados.nome !== undefined) payloadAtualizacao.nome = dadosValidados.nome;
+        if (dadosValidados.descricao !== undefined) payloadAtualizacao.descricao = dadosValidados.descricao;
+
+        if (Object.keys(payloadAtualizacao).length > 0) {
+            const treinoAtualizado = await this.repository.update(id, payloadAtualizacao);
+
+            if (!treinoAtualizado) {
+                throw new Error('Treino não encontrado');
+            }
+        }
+
+        if (idsResolvidosParaRemocao.length > 0) {
+            await this.repository.removeExerciciosDoTreino(id, idsResolvidosParaRemocao);
+        }
+
+        if (adicionarExercicios.length > 0) {
+            await this.repository.addExerciciosAoTreino(id, adicionarExercicios);
+        }
+
+        const treinoAtualizadoComExercicios = await this.repository.findById(
+            id,
+            treinoDetalheQuerySchema.parse({}),
+        );
+
+        if (!treinoAtualizadoComExercicios) {
+            throw new Error('Treino não encontrado');
+        }
+
+        return treinoAtualizadoComExercicios;
     }
 }
 

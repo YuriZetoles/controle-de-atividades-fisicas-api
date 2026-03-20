@@ -2,6 +2,7 @@ import { OpenAPIRegistry } from '@asteasolutions/zod-to-openapi';
 import { z } from 'zod';
 import {
     treinoSchema,
+    treinoUpdateSchema,
     treinoDetalheQuerySchema,
     treinoListQuerySchema,
 } from '../utils/validations/treinoValidation';
@@ -68,7 +69,7 @@ treinoRegistry.registerPath({
     method: 'post',
     path: '/treinos',
     summary: 'Criar treino',
-    description: 'Cria um novo treino. Aluno pode criar apenas treino próprio; treinador/admin podem criar para qualquer aluno existente. Quando criado por aluno, treinador_id pode ser null.',
+    description: 'Cria um novo treino. Pode ser criado sem exercícios ou já com composição inicial de exercícios. Aluno pode criar apenas treino próprio; treinador/admin podem criar para qualquer aluno existente.',
     tags: ['Treino'],
     security: [{ BearerAuth: [] }],
     request: {
@@ -88,7 +89,7 @@ treinoRegistry.registerPath({
                         error: z.boolean().openapi({ example: false }),
                         code: z.number().openapi({ example: 201 }),
                         message: z.string().nullable().openapi({ example: 'Recurso criado com sucesso' }),
-                        data: TreinoResponse,
+                        data: TreinoDetalhadoResponse,
                         errors: z.array(z.any()),
                     }),
                 },
@@ -164,5 +165,44 @@ treinoRegistry.registerPath({
         401: { description: 'Não autorizado' },
         403: { description: 'Sem permissão para listar treinos com os filtros informados' },
         422: { description: 'Parâmetros de query inválidos' },
+    },
+});
+
+// PATCH /treinos/{id}
+treinoRegistry.registerPath({
+    method: 'patch',
+    path: '/treinos/{id}',
+    summary: 'Atualizar treino',
+    description: 'Atualiza parcialmente um treino e sua composição de exercícios. Permite alterar nome/descricao, adicionar novos itens e remover itens existentes por ID de treino_exercicio. Não permite alterar aluno dono (usuario_id) nem treinador responsável (treinador_id).',
+    tags: ['Treino'],
+    security: [{ BearerAuth: [] }],
+    request: {
+        params: TreinoIdParam,
+        body: {
+            required: true,
+            content: {
+                'application/json': { schema: treinoUpdateSchema },
+            },
+        },
+    },
+    responses: {
+        200: {
+            description: 'Treino atualizado com sucesso',
+            content: {
+                'application/json': {
+                    schema: z.object({
+                        error: z.boolean().openapi({ example: false }),
+                        code: z.number().openapi({ example: 200 }),
+                        message: z.string().nullable(),
+                        data: TreinoDetalhadoResponse,
+                        errors: z.array(z.any()),
+                    }),
+                },
+            },
+        },
+        401: { description: 'Não autorizado' },
+        403: { description: 'Sem permissão para atualizar este treino' },
+        404: { description: 'Treino não encontrado' },
+        422: { description: 'Parâmetros de rota/body inválidos' },
     },
 });
