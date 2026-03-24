@@ -1,6 +1,7 @@
 import { OpenAPIRegistry, OpenApiGeneratorV3 } from "@asteasolutions/zod-to-openapi";
 import { academiaRegistry } from "./academiaDoc";
 import { alunoRegistry } from "./alunoDoc";
+import { treinadorRegistry } from "./treinadorDoc";
 import { exercicioRegistry } from "./exercicioDoc";
 import { authRegistry } from "./authDoc";
 import { treinoRegistry } from "./treinoDoc";
@@ -9,6 +10,7 @@ import { sessaoRegistry } from "./sessaoDoc";
 const registry = new OpenAPIRegistry([
     academiaRegistry,
     alunoRegistry,
+    treinadorRegistry,
     exercicioRegistry,
     authRegistry,
     treinoRegistry,
@@ -38,6 +40,7 @@ export const openApiDocument = generator.generateDocument({
         { name: "Auth", description: "Autenticação e gerenciamento de sessão" },
         { name: "Academia", description: "CRUD de academias" },
         { name: "Aluno", description: "CRUD de alunos" },
+        { name: "Treinador", description: "Endpoints de treinadores" },
         { name: "Exercicio", description: "CRUD de exercícios" },
         { name: "Treino", description: "CRUD de treinos" },
         { name: "Sessao", description: "Sessões de treino" },
