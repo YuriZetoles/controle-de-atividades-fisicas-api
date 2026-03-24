@@ -6,5 +6,15 @@ const router = express.Router();
 const sessaoController = new SessaoController();
 
 router.post('/sessoes', authMiddleware, sessaoController.createSessao);
+router.get('/sessoes/em-andamento', authMiddleware, sessaoController.getSessaoEmAndamento);
+
+// GET /sessoes — listagem paginada com filtros
+router.get('/sessoes', authMiddleware, sessaoController.listSessoes);
+
+// GET /sessoes/:id — detalhe completo
+router.get('/sessoes/:id', authMiddleware, sessaoController.getSessaoById);
+
+// GET /sessoes/:id/resumo — campos calculados
+router.get('/sessoes/:id/resumo', authMiddleware, sessaoController.getSessaoResumo);
 
 export default router;

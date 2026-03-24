@@ -1,6 +1,6 @@
 import SessaoRepository, { SessaoComDetalhe } from '../repositories/sessaoRepository';
 import UsuarioRepository from '../repositories/usuarioRepository';
-import { sessaoSchema, sessaoIdSchema } from '../utils/validations/sessaoValidation';
+import { sessaoSchema, sessaoIdSchema, sessaoListQuerySchema, SessaoListQuery } from '../utils/validations/sessaoValidation';
 import { ZodError } from 'zod';
 import { type_sessao_exercicio, type_sessao_serie, type_sessao_treino } from '../types/dbSchemas';
 
@@ -79,11 +79,109 @@ class SessaoService {
 
         const perfil = await this.usuarioRepository.buscarPerfilAcesso(userId);
 
-        if (!perfil.isAdmin && perfil.alunoId !== sessao.aluno_id) {
-            throw new Error('FORBIDDEN: você não tem permissão para visualizar esta sessão');
+        if (!perfil.isAdmin) {
+            if (perfil.isAluno && perfil.alunoId !== sessao.aluno_id) {
+                throw new Error('FORBIDDEN: você não tem permissão para visualizar esta sessão');
+            }
+            if (perfil.isTreinador && !perfil.isAluno) {
+                const alunosDoTreinador = await this.repository.buscarAlunosDoTreinador(perfil.treinadorId!);
+                if (!alunosDoTreinador.includes(sessao.aluno_id)) {
+                    throw new Error('FORBIDDEN: você não tem permissão para visualizar esta sessão');
+                }
+            }
         }
 
         return sessao;
+    }
+
+    async listSessoes(query: any, userId: string): Promise<{
+        dados: Omit<SessaoComDetalhe, 'exercicios'>[];
+        total: number;
+        page: number;
+        limite: number;
+        totalPages: number;
+    }> {
+        const filtros = sessaoListQuerySchema.parse(query) as SessaoListQuery;
+
+        const perfil = await this.usuarioRepository.buscarPerfilAcesso(userId);
+
+        if (perfil.isAdmin) {
+            return this.repository.findAll(filtros);
+        }
+
+        if (perfil.isAluno && perfil.alunoId) {
+            const alunoIdFiltro = filtros.aluno_id ?? perfil.alunoId;
+            if (filtros.aluno_id && filtros.aluno_id !== perfil.alunoId) {
+                throw new Error('FORBIDDEN: você só pode visualizar suas próprias sessões');
+            }
+            return this.repository.findAll({ ...filtros, aluno_id: alunoIdFiltro });
+        }
+
+        if (perfil.isTreinador && perfil.treinadorId) {
+            const alunosDoTreinador = await this.repository.buscarAlunosDoTreinador(perfil.treinadorId);
+            if (alunosDoTreinador.length === 0) {
+                return { dados: [], total: 0, page: filtros.page, limite: filtros.limite, totalPages: 0 };
+            }
+            const alunoIds = filtros.aluno_id
+                ? (alunosDoTreinador.includes(filtros.aluno_id) ? [filtros.aluno_id] : null)
+                : alunosDoTreinador;
+
+            if (alunoIds === null) {
+                return { dados: [], total: 0, page: filtros.page, limite: filtros.limite, totalPages: 0 };
+            }
+
+            return this.repository.findAll(filtros, alunoIds);
+        }
+
+        throw new Error('FORBIDDEN: perfil de acesso não autorizado');
+    }
+
+    async getSessaoEmAndamento(userId: string): Promise<SessaoComDetalhe | null> {
+        const perfil = await this.usuarioRepository.buscarPerfilAcesso(userId);
+
+        if (!perfil.isAluno || !perfil.alunoId) {
+            throw new Error('FORBIDDEN: apenas alunos podem consultar sessão em andamento');
+        }
+
+        return this.repository.findEmAndamento(perfil.alunoId);
+    }
+
+    async getSessaoResumo(idParam: string, userId: string): Promise<{
+        duracao_minutos: number | null;
+        exercicios_concluidos: number;
+        exercicios_total: number;
+        series_concluidas: number;
+        series_total: number;
+        volume_total_kg: number;
+        taxa_conclusao: number;
+    }> {
+        const id = sessaoIdSchema.parse(idParam);
+
+        const sessao = await this.repository.findById(id);
+        if (!sessao) {
+            throw new Error('Sessão não encontrada');
+        }
+
+        const perfil = await this.usuarioRepository.buscarPerfilAcesso(userId);
+
+        if (!perfil.isAdmin) {
+            if (perfil.isAluno && perfil.alunoId !== sessao.aluno_id) {
+                throw new Error('FORBIDDEN: você não tem permissão para visualizar esta sessão');
+            }
+            if (perfil.isTreinador && !perfil.isAluno) {
+                const alunosDoTreinador = await this.repository.buscarAlunosDoTreinador(perfil.treinadorId!);
+                if (!alunosDoTreinador.includes(sessao.aluno_id)) {
+                    throw new Error('FORBIDDEN: você não tem permissão para visualizar esta sessão');
+                }
+            }
+        }
+
+        const resumo = await this.repository.getSessaoResumo(id);
+        if (!resumo) {
+            throw new Error('Sessão não encontrada');
+        }
+
+        return resumo;
     }
 }
 

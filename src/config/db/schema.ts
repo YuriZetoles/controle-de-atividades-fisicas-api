@@ -1,4 +1,4 @@
-import { integer, pgTable, varchar, date, pgEnum, boolean, primaryKey, timestamp, decimal, text, uuid } from 'drizzle-orm/pg-core';
+import { integer, pgTable, varchar, date, pgEnum, boolean, primaryKey, timestamp, decimal, text, uuid, uniqueIndex } from 'drizzle-orm/pg-core';
 import { sql, relations } from 'drizzle-orm';
 
 // Enums
@@ -347,7 +347,6 @@ export const statusSessaoEnum = pgEnum('status_sessao', ['EM_ANDAMENTO', 'CONCLU
 export const statusSerieEnum = pgEnum('status_serie', ['PENDENTE', 'CONCLUIDA', 'PULADA']);
 
 // Tabelas de Sessão
-// Index parcial único em aluno_id WHERE status = 'EM_ANDAMENTO' é criado via SQL na migration
 export const sessao_treino = pgTable('sessao_treino', {
     id: uuid('id').defaultRandom().primaryKey(),
     aluno_id: uuid('aluno_id').notNull().references(() => aluno.id),
@@ -356,7 +355,11 @@ export const sessao_treino = pgTable('sessao_treino', {
     inicio: timestamp('inicio').defaultNow().notNull(),
     fim: timestamp('fim'),
     observacoes: text('observacoes'),
-});
+}, (table) => [
+    uniqueIndex('sessao_treino_aluno_em_andamento_idx')
+        .on(table.aluno_id)
+        .where(sql`${table.status} = 'EM_ANDAMENTO'`),
+]);
 
 export const sessao_exercicio = pgTable('sessao_exercicio', {
     id: uuid('id').defaultRandom().primaryKey(),
