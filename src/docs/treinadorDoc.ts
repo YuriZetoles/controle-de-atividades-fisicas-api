@@ -63,4 +63,37 @@ treinadorRegistry.registerPath({
   },
 });
 
-
+// GET /treinadores/{id}
+treinadorRegistry.registerPath({
+  method: "get",
+  path: "/treinadores/{id}",
+  summary: "Buscar treinador por ID",
+  description: "Retorna um treinador pelo ID.",
+  tags: ["Treinador"],
+  security: [{ BearerAuth: [] }],
+  request: {
+    params: idParam,
+  },
+  responses: {
+    200: {
+      description: "Treinador encontrado",
+      content: {
+        "application/json": {
+          schema: z.object({
+            error: z.boolean().openapi({ example: false }),
+            code: z.number().openapi({ example: 200 }),
+            message: z
+              .string()
+              .nullable()
+              .openapi({ example: "Treinador encontrado com sucesso" }),
+            data: TreinadorResponse,
+            errors: z.array(z.any()),
+          }),
+        },
+      },
+    },
+    401: { description: "Não autorizado" },
+    404: { description: "Treinador não encontrado" },
+    422: { description: "ID inválido" },
+  },
+});
