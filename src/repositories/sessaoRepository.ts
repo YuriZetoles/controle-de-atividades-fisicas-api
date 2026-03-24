@@ -1,5 +1,5 @@
 import { DataBase } from '../config/DbConnect';
-import { eq, and, inArray } from 'drizzle-orm';
+import { eq, and, inArray, asc, desc, sql } from 'drizzle-orm';
 import {
     sessao_treino,
     sessao_exercicio,
@@ -10,6 +10,8 @@ import {
 } from '../config/db/schema';
 import { type_sessao_treino, type_sessao_exercicio, type_sessao_serie } from '../types/dbSchemas';
 import { parseDatabaseError } from '../utils/errors/DatabaseError';
+import SessaoFilterBuilder from './filters/SessaoFilterBuilder';
+import { SessaoListQuery } from '../utils/validations/sessaoValidation';
 
 export interface SessaoSerieDetalhe {
     id: string;
@@ -216,6 +218,192 @@ class SessaoRepository {
             return resultado.length > 0;
         } catch (error) {
             throw parseDatabaseError(error, 'SessaoRepository.verificarSessaoEmAndamento');
+        }
+    }
+
+    async findAll(
+        filtros: SessaoListQuery,
+        alunoIds?: string[],
+    ): Promise<{ dados: Omit<SessaoComDetalhe, 'exercicios'>[]; total: number; page: number; limite: number; totalPages: number }> {
+        try {
+            const builder = new SessaoFilterBuilder()
+                .comTreinoId(filtros.treino_id)
+                .comStatus(filtros.status as 'EM_ANDAMENTO' | 'CONCLUIDA' | 'CANCELADA' | undefined)
+                .comDataInicio(filtros.data_inicio)
+                .comDataFim(filtros.data_fim);
+
+            if (alunoIds !== undefined) {
+                builder.comAlunoIds(alunoIds);
+            } else if (filtros.aluno_id) {
+                builder.comAlunoId(filtros.aluno_id);
+            }
+
+            const where = builder.build();
+            const offset = (filtros.page - 1) * filtros.limite;
+
+            const [sessoes, countResult] = await Promise.all([
+                this.db
+                    .select({
+                        id: sessao_treino.id,
+                        aluno_id: sessao_treino.aluno_id,
+                        treino_id: sessao_treino.treino_id,
+                        status: sessao_treino.status,
+                        inicio: sessao_treino.inicio,
+                        fim: sessao_treino.fim,
+                        observacoes: sessao_treino.observacoes,
+                        treino_nome: treino.nome,
+                    })
+                    .from(sessao_treino)
+                    .innerJoin(treino, eq(sessao_treino.treino_id, treino.id))
+                    .where(where)
+                    .limit(filtros.limite)
+                    .offset(offset)
+                    .orderBy(
+                        filtros.ordem_data_inicio === 'asc'
+                            ? asc(sessao_treino.inicio)
+                            : desc(sessao_treino.inicio),
+                    ),
+                this.db
+                    .select({ count: sql<number>`count(*)` })
+                    .from(sessao_treino)
+                    .where(where),
+            ]);
+
+            const total = Number(countResult[0].count);
+
+            return {
+                dados: sessoes.map((s) => ({
+                    id: s.id,
+                    aluno_id: s.aluno_id,
+                    treino_id: s.treino_id,
+                    status: s.status as 'EM_ANDAMENTO' | 'CONCLUIDA' | 'CANCELADA',
+                    inicio: s.inicio,
+                    fim: s.fim,
+                    observacoes: s.observacoes,
+                    treino_nome: s.treino_nome,
+                })),
+                total,
+                page: filtros.page,
+                limite: filtros.limite,
+                totalPages: Math.ceil(total / filtros.limite),
+            };
+        } catch (error) {
+            throw parseDatabaseError(error, 'SessaoRepository.findAll');
+        }
+    }
+
+    async findEmAndamento(alunoId: string): Promise<SessaoComDetalhe | null> {
+        try {
+            const rows = await this.db
+                .select({ id: sessao_treino.id })
+                .from(sessao_treino)
+                .where(
+                    and(
+                        eq(sessao_treino.aluno_id, alunoId),
+                        eq(sessao_treino.status, 'EM_ANDAMENTO'),
+                    ),
+                )
+                .limit(1);
+
+            if (!rows[0]) return null;
+
+            return this.findById(rows[0].id);
+        } catch (error) {
+            throw parseDatabaseError(error, 'SessaoRepository.findEmAndamento');
+        }
+    }
+
+    async getSessaoResumo(id: string): Promise<{
+        duracao_minutos: number | null;
+        exercicios_concluidos: number;
+        exercicios_total: number;
+        series_concluidas: number;
+        series_total: number;
+        volume_total_kg: number;
+        taxa_conclusao: number;
+    } | null> {
+        try {
+            const sessaoRows = await this.db
+                .select({
+                    status: sessao_treino.status,
+                    inicio: sessao_treino.inicio,
+                    fim: sessao_treino.fim,
+                })
+                .from(sessao_treino)
+                .where(eq(sessao_treino.id, id))
+                .limit(1);
+
+            if (!sessaoRows[0]) return null;
+
+            const sessao = sessaoRows[0];
+
+            const fimEfetivo = sessao.fim ?? new Date();
+            const duracao_minutos = sessao.status === 'EM_ANDAMENTO' && !sessao.fim
+                ? null
+                : Math.round((fimEfetivo.getTime() - sessao.inicio.getTime()) / 60000);
+
+            const exerciciosRows = await this.db
+                .select({
+                    id: sessao_exercicio.id,
+                    concluido: sessao_exercicio.concluido,
+                })
+                .from(sessao_exercicio)
+                .where(eq(sessao_exercicio.sessao_treino_id, id));
+
+            const exercicios_total = exerciciosRows.length;
+            const exercicios_concluidos = exerciciosRows.filter((e) => e.concluido).length;
+
+            const exercicioIds = exerciciosRows.map((e) => e.id);
+
+            const seriesRows = exercicioIds.length > 0
+                ? await this.db
+                    .select({
+                        status: sessao_serie.status,
+                        repeticoes_realizadas: sessao_serie.repeticoes_realizadas,
+                        carga_utilizada: sessao_serie.carga_utilizada,
+                    })
+                    .from(sessao_serie)
+                    .where(inArray(sessao_serie.sessao_exercicio_id, exercicioIds))
+                : [];
+
+            const series_total = seriesRows.length;
+            const series_concluidas = seriesRows.filter((s) => s.status === 'CONCLUIDA').length;
+
+            const volume_total_kg = seriesRows.reduce((acc, s) => {
+                if (s.status === 'CONCLUIDA' && s.carga_utilizada && s.repeticoes_realizadas) {
+                    return acc + parseFloat(s.carga_utilizada) * s.repeticoes_realizadas;
+                }
+                return acc;
+            }, 0);
+
+            const taxa_conclusao = series_total > 0
+                ? Math.round((series_concluidas / series_total) * 100)
+                : 0;
+
+            return {
+                duracao_minutos,
+                exercicios_concluidos,
+                exercicios_total,
+                series_concluidas,
+                series_total,
+                volume_total_kg: Math.round(volume_total_kg * 100) / 100,
+                taxa_conclusao,
+            };
+        } catch (error) {
+            throw parseDatabaseError(error, 'SessaoRepository.getSessaoResumo');
+        }
+    }
+
+    async buscarAlunosDoTreinador(treinadorId: string): Promise<string[]> {
+        try {
+            const rows = await this.db
+                .select({ aluno_id: treino.usuario_id })
+                .from(treino)
+                .where(eq(treino.treinador_id, treinadorId));
+
+            return [...new Set(rows.map((r) => r.aluno_id))];
+        } catch (error) {
+            throw parseDatabaseError(error, 'SessaoRepository.buscarAlunosDoTreinador');
         }
     }
 
