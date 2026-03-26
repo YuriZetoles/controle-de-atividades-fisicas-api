@@ -17,6 +17,9 @@ router.get('/sessoes/:id', authMiddleware, sessaoController.getSessaoById);
 // GET /sessoes/:id/resumo — campos calculados
 router.get('/sessoes/:id/resumo', authMiddleware, sessaoController.getSessaoResumo);
 
+// PUT /sessoes/:id/exercicios/:exercicioId/series — replace total das séries do exercício
+router.put('/sessoes/:id/exercicios/:exercicioId/series', authMiddleware, sessaoController.updateSeriesExercicio);
+
 // POST /sessoes/:id/finalizar — finaliza a sessão
 router.post('/sessoes/:id/finalizar', authMiddleware, sessaoController.finalizarSessao);
 

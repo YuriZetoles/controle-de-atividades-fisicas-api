@@ -1,6 +1,6 @@
 import SessaoRepository, { SessaoComDetalhe } from '../repositories/sessaoRepository';
 import UsuarioRepository from '../repositories/usuarioRepository';
-import { sessaoSchema, sessaoIdSchema, sessaoListQuerySchema, SessaoListQuery, sessaoUpdateSchema, sessaoExercicioUpdateSchema, exercicioIdSchema } from '../utils/validations/sessaoValidation';
+import { sessaoSchema, sessaoIdSchema, sessaoListQuerySchema, SessaoListQuery, sessaoUpdateSchema, sessaoExercicioUpdateSchema, exercicioIdSchema, sessaoSeriesUpdateSchema, SessaoSeriesUpdate } from '../utils/validations/sessaoValidation';
 import { ZodError } from 'zod';
 import { type_sessao_exercicio, type_sessao_serie, type_sessao_treino } from '../types/dbSchemas';
 
@@ -240,6 +240,37 @@ class SessaoService {
                 }
             }
         }
+    }
+
+    async updateSeriesExercicio(
+        idParam: string,
+        exercicioIdParam: string,
+        body: any,
+        userId: string,
+    ): Promise<SessaoComDetalhe> {
+        const id = sessaoIdSchema.parse(idParam);
+        const exercicioId = exercicioIdSchema.parse(exercicioIdParam);
+        const dados: SessaoSeriesUpdate = sessaoSeriesUpdateSchema.parse(body);
+
+        const sessaoStatus = await this.repository.findSessaoStatus(id);
+        if (!sessaoStatus) {
+            throw new Error('Sessão não encontrada');
+        }
+
+        if (sessaoStatus.status !== 'EM_ANDAMENTO') {
+            throw new Error('UNPROCESSABLE: a sessão não está em andamento');
+        }
+
+        await this._verificarAcessoSessao(userId, sessaoStatus.aluno_id);
+
+        const sessaoExercicio = await this.repository.findSessaoExercicio(id, exercicioId);
+        if (!sessaoExercicio) {
+            throw new Error('Exercício não encontrado nesta sessão');
+        }
+
+        await this.repository.replaceSeriesDoExercicio(exercicioId, dados.series);
+
+        return await this.repository.findById(id) as SessaoComDetalhe;
     }
 
     async finalizarSessao(idParam: string, userId: string): Promise<SessaoComDetalhe & {

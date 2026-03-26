@@ -394,6 +394,33 @@ class SessaoRepository {
         }
     }
 
+    async replaceSeriesDoExercicio(
+        sessaoExercicioId: string,
+        series: {
+            numero_serie: number;
+            repeticoes_realizadas?: number | null;
+            carga_utilizada?: string | null;
+            status: 'PENDENTE' | 'CONCLUIDA' | 'PULADA';
+            observacoes?: string | null;
+        }[],
+    ): Promise<void> {
+        try {
+            await this.db.transaction(async (tx) => {
+                await tx
+                    .delete(sessao_serie)
+                    .where(eq(sessao_serie.sessao_exercicio_id, sessaoExercicioId));
+
+                if (series.length > 0) {
+                    await tx.insert(sessao_serie).values(
+                        series.map((s) => ({ ...s, sessao_exercicio_id: sessaoExercicioId })),
+                    );
+                }
+            });
+        } catch (error) {
+            throw parseDatabaseError(error, 'SessaoRepository.replaceSeriesDoExercicio');
+        }
+    }
+
     async updateStatusFim(id: string, status: 'CONCLUIDA' | 'CANCELADA'): Promise<void> {
         try {
             await this.db
