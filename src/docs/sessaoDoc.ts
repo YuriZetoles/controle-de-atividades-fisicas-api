@@ -1,6 +1,6 @@
 import { OpenAPIRegistry } from "@asteasolutions/zod-to-openapi";
 import { z } from "zod";
-import { sessaoSchema, sessaoUpdateSchema, sessaoExercicioUpdateSchema } from "../utils/validations/sessaoValidation";
+import { sessaoSchema, sessaoUpdateSchema, sessaoExercicioUpdateSchema, sessaoSeriesUpdateSchema } from "../utils/validations/sessaoValidation";
 
 export const sessaoRegistry = new OpenAPIRegistry();
 
@@ -462,5 +462,55 @@ sessaoRegistry.registerPath({
         403: { description: "Sem permissão para cancelar esta sessão" },
         404: { description: "Sessão não encontrada" },
         422: { description: "Sessão já finalizada ou cancelada / ID inválido" },
+    },
+});
+
+// PUT /sessoes/:id/exercicios/:exercicioId/series
+sessaoRegistry.registerPath({
+    method: "put",
+    path: "/sessoes/{id}/exercicios/{exercicioId}/series",
+    summary: "Substituir séries de um exercício da sessão",
+    description: `Replace total das séries do exercício (delete + insert em transação).
+
+Idempotente: enviar o mesmo payload múltiplas vezes produz o mesmo resultado. Projetado para suportar sync offline do app mobile.
+
+**Regras:**
+- Apenas sessões EM_ANDAMENTO podem ser modificadas
+- O exercício deve pertencer à sessão informada
+- numero_serie deve ser único dentro do array enviado
+- Retorna 422 se a sessão não estiver em andamento`,
+    tags: ["Sessao"],
+    security: [{ BearerAuth: [] }],
+    request: {
+        params: z.object({
+            id: z.string().uuid().openapi({ example: "550e8400-e29b-41d4-a716-446655440000" }),
+            exercicioId: z.string().uuid().openapi({ example: "550e8400-e29b-41d4-a716-446655440005" }),
+        }),
+        body: {
+            required: true,
+            content: {
+                "application/json": { schema: sessaoSeriesUpdateSchema },
+            },
+        },
+    },
+    responses: {
+        200: {
+            description: "Séries substituídas com sucesso",
+            content: {
+                "application/json": {
+                    schema: z.object({
+                        error: z.boolean().openapi({ example: false }),
+                        code: z.number().openapi({ example: 200 }),
+                        message: z.string().nullable().openapi({ example: null }),
+                        data: SessaoResponse,
+                        errors: z.array(z.any()),
+                    }),
+                },
+            },
+        },
+        401: { description: "Não autorizado" },
+        403: { description: "Sem permissão para modificar esta sessão" },
+        404: { description: "Sessão ou exercício não encontrado" },
+        422: { description: "Sessão não está em andamento / numero_serie duplicado / erro de validação" },
     },
 });

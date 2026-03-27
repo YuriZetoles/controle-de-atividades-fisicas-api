@@ -106,6 +106,40 @@ class SessaoController {
         }
     }
 
+    updateSeriesExercicio = async (req: Request, res: Response) => {
+        try {
+            const userId = (req as any).user?.id as string;
+            const resposta = await this.service.updateSeriesExercicio(
+                req.params.id as string,
+                req.params.exercicioId as string,
+                req.body,
+                userId,
+            );
+            return CommonResponse.success(res, resposta);
+        } catch (error) {
+            if (error instanceof ZodError) {
+                return CommonResponse.error(res, HttpStatusCode.UNPROCESSABLE_ENTITY.code, null, null, error.issues, HttpStatusCode.UNPROCESSABLE_ENTITY.message);
+            }
+            if (error instanceof DatabaseError) {
+                return CommonResponse.error(res, error.statusCode, null, null, [error.toJSON()], error.message);
+            }
+            if (error instanceof Error) {
+                if (error.message.startsWith('FORBIDDEN:')) {
+                    return CommonResponse.error(res, HttpStatusCode.FORBIDDEN.code, null, null, [], error.message.replace('FORBIDDEN: ', ''));
+                }
+                if (error.message.startsWith('UNPROCESSABLE:')) {
+                    return CommonResponse.error(res, HttpStatusCode.UNPROCESSABLE_ENTITY.code, null, null, [], error.message.replace('UNPROCESSABLE: ', ''));
+                }
+                if (error.message === 'Sessão não encontrada' || error.message === 'Exercício não encontrado nesta sessão') {
+                    return CommonResponse.error(res, HttpStatusCode.NOT_FOUND.code, null, null, [], error.message);
+                }
+            }
+            const msg = error instanceof Error ? error.message : 'Erro desconhecido';
+            console.error('[SessaoController] [updateSeriesExercicio] Erro interno:', msg);
+            return CommonResponse.serverError(res, { message: msg }, HttpStatusCode.INTERNAL_SERVER_ERROR.message);
+        }
+    }
+
     finalizarSessao = async (req: Request, res: Response) => {
         try {
             const userId = (req as any).user?.id as string;

@@ -84,5 +84,54 @@ const exercicioIdSchema = z
     .uuid('ID do exercício inválido, deve ser um UUID válido')
     .openapi({ description: "UUID do exercício da sessão", example: "550e8400-e29b-41d4-a716-446655440005" });
 
-export { sessaoSchema, sessaoIdSchema, sessaoListQuerySchema, sessaoUpdateSchema, sessaoExercicioUpdateSchema, exercicioIdSchema };
-export type { SessaoListQuery };
+const serieItemSchema = z.object({
+    numero_serie: z
+        .number({ message: 'numero_serie deve ser um número inteiro positivo' })
+        .int({ message: 'numero_serie deve ser um número inteiro' })
+        .positive({ message: 'numero_serie deve ser maior que 0' })
+        .openapi({ description: "Número da série (começa em 1)", example: 1 }),
+    repeticoes_realizadas: z
+        .number({ message: 'repeticoes_realizadas deve ser um número inteiro positivo' })
+        .int({ message: 'repeticoes_realizadas deve ser um número inteiro' })
+        .positive({ message: 'repeticoes_realizadas deve ser maior que 0' })
+        .nullable()
+        .optional()
+        .openapi({ description: "Número de repetições realizadas", example: 12 }),
+    carga_utilizada: z
+        .string()
+        .regex(/^\d+(\.\d{1,2})?$/, { message: 'carga_utilizada deve ser um número decimal válido (ex: 80 ou 80.50)' })
+        .nullable()
+        .optional()
+        .openapi({ description: "Carga utilizada em kg (decimal)", example: "80.50" }),
+    status: z
+        .enum(['PENDENTE', 'CONCLUIDA', 'PULADA'], { message: 'status deve ser PENDENTE, CONCLUIDA ou PULADA' })
+        .openapi({ description: "Status da série", example: "CONCLUIDA" }),
+    observacoes: z
+        .string()
+        .max(1000, { message: 'observacoes deve ter no máximo 1000 caracteres' })
+        .nullable()
+        .optional()
+        .openapi({ description: "Observações sobre a série", example: "Senti dificuldade na última repetição" }),
+}).strict().openapi("SerieItem");
+
+const sessaoSeriesUpdateSchema = z.object({
+    series: z
+        .array(serieItemSchema, { message: 'series deve ser um array de séries' })
+        .min(1, { message: 'series deve conter ao menos uma série' })
+        .openapi({ description: "Lista de séries para substituição total" }),
+}).strict().superRefine((val, ctx) => {
+    const numeros = val.series.map((s) => s.numero_serie);
+    const duplicados = numeros.filter((n, i) => numeros.indexOf(n) !== i);
+    if (duplicados.length > 0) {
+        ctx.addIssue({
+            code: 'custom',
+            path: ['series'],
+            message: `numero_serie deve ser único dentro do array. Duplicados: ${[...new Set(duplicados)].join(', ')}`,
+        });
+    }
+}).openapi("SessaoSeriesUpdate");
+
+type SessaoSeriesUpdate = z.infer<typeof sessaoSeriesUpdateSchema>;
+
+export { sessaoSchema, sessaoIdSchema, sessaoListQuerySchema, sessaoUpdateSchema, sessaoExercicioUpdateSchema, exercicioIdSchema, sessaoSeriesUpdateSchema };
+export type { SessaoListQuery, SessaoSeriesUpdate };
