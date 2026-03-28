@@ -4,6 +4,7 @@ import CommonResponse from "../utils/helpers/commonResponse";
 import HttpStatusCode from "../utils/helpers/httpStatusCode";
 import { ZodError } from "zod";
 import { DatabaseError } from "../utils/errors/DatabaseError";
+import { type_treinador } from "../types/dbSchemas";
 
 class TreinadorController {
 	private service: TreinadorService;
@@ -56,6 +57,60 @@ class TreinadorController {
 			);
 		} catch (error) {
 			return this.handleError(res, error, "getTreinadorById");
+		}
+	};
+
+	createTreinador = async (req: Request, res: Response) => {
+		console.log("[TreinadorController] [createTreinador] Requisição recebida");
+
+		const usuarioAutenticado = (req as any).user;
+		const userId = usuarioAutenticado?.id;
+
+		if (!userId) {
+			return CommonResponse.error(
+				res,
+				HttpStatusCode.UNAUTHORIZED.code,
+				null,
+				null,
+				[],
+				"Usuário não autenticado",
+			);
+		}
+
+		const novoTreinador: type_treinador = {
+			user_id: userId,
+			nome: req.body.nome,
+			data_nascimento: req.body.data_nascimento,
+			sexo: req.body.sexo,
+			cref: req.body.cref,
+			turnos: req.body.turnos,
+			especializacao: req.body.especializacao,
+			graduacao: req.body.graduacao,
+			url_foto: req.body.url_foto || null,
+			status_conta: req.body.status_conta ?? true,
+			academia_id: req.body.academia_id,
+		};
+
+		if (!novoTreinador.nome) {
+			return CommonResponse.error(
+				res,
+				HttpStatusCode.BAD_REQUEST.code,
+				null,
+				"",
+				[],
+				"Dados do treinador são obrigatórios (nome)",
+			);
+		}
+
+		try {
+			const resposta = await this.service.createTreinador(novoTreinador);
+			return CommonResponse.created(
+				res,
+				resposta,
+				HttpStatusCode.CREATED.message,
+			);
+		} catch (error) {
+			return this.handleError(res, error, "createTreinador");
 		}
 	};
 

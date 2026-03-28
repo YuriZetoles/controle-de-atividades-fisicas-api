@@ -8,6 +8,7 @@ const treinadorController = new TreinadorController();
 
 router
 	.get("/treinadores", authMiddleware, treinadorController.getAllTreinadores)
-	.get("/treinadores/:id", authMiddleware, treinadorController.getTreinadorById);
+	.get("/treinadores/:id", authMiddleware, treinadorController.getTreinadorById)
+	.post("/treinadores", authMiddleware, treinadorController.createTreinador);
 
 export default router;
