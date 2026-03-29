@@ -1,11 +1,14 @@
 import { DataBase } from '../config/DbConnect';
-import { eq, and, gte, lte, inArray, desc, sql } from 'drizzle-orm';
+import { eq, and, gte, lte, inArray, asc, desc, sql } from 'drizzle-orm';
 import {
     sessao_treino,
     sessao_exercicio,
     sessao_serie,
     treino,
     treino_exercicio,
+    exercicio,
+    exercicio_musculo,
+    musculo,
 } from '../config/db/schema';
 import { parseDatabaseError } from '../utils/errors/DatabaseError';
 
@@ -27,6 +30,21 @@ export interface ProgressaoItem {
     maior_carga: number | null;
     media_repeticoes: number | null;
     volume_total: number;
+}
+
+export interface GrupoMuscularItem {
+    grupo_muscular: string;
+    total_series: number;
+    volume_total_kg: number;
+    percentual: number;
+}
+
+export interface ExercicioFrequenteItem {
+    exercicio_id: string;
+    nome: string;
+    total_sessoes: number;
+    total_series: number;
+    volume_total_kg: number;
 }
 
 class HistoricoRepository {
@@ -206,6 +224,109 @@ class HistoricoRepository {
             return [...new Set(rows.map((r) => r.aluno_id))];
         } catch (error) {
             throw parseDatabaseError(error, 'HistoricoRepository.buscarAlunosDoTreinador');
+        }
+    }
+
+    async getGruposMusculares(
+        alunoId: string,
+        dataInicio?: string,
+        dataFim?: string,
+    ): Promise<GrupoMuscularItem[]> {
+        try {
+            const rows = await this.db
+                .select({
+                    grupo_muscular: musculo.grupo_muscular,
+                    total_series: sql<string>`count(${sessao_serie.id})`,
+                    volume_total_kg: sql<string>`coalesce(sum(
+                        case
+                            when ${sessao_serie.carga_utilizada} is not null
+                             and ${sessao_serie.repeticoes_realizadas} is not null
+                            then ${sessao_serie.carga_utilizada}::numeric * ${sessao_serie.repeticoes_realizadas}
+                            else 0
+                        end
+                    ), 0)`,
+                })
+                .from(sessao_treino)
+                .innerJoin(sessao_exercicio, eq(sessao_exercicio.sessao_treino_id, sessao_treino.id))
+                .innerJoin(treino_exercicio, eq(sessao_exercicio.treino_exercicio_id, treino_exercicio.id))
+                .innerJoin(exercicio, eq(treino_exercicio.exercicio_id, exercicio.id))
+                .innerJoin(exercicio_musculo, eq(exercicio_musculo.exercicio_id, exercicio.id))
+                .innerJoin(musculo, eq(exercicio_musculo.musculo_id, musculo.id))
+                .innerJoin(sessao_serie, eq(sessao_serie.sessao_exercicio_id, sessao_exercicio.id))
+                .where(
+                    and(
+                        eq(sessao_treino.aluno_id, alunoId),
+                        eq(sessao_treino.status, 'CONCLUIDA'),
+                        eq(sessao_serie.status, 'CONCLUIDA'),
+                        dataInicio ? gte(sessao_treino.inicio, new Date(dataInicio)) : undefined,
+                        dataFim ? lte(sessao_treino.inicio, new Date(dataFim)) : undefined,
+                    ),
+                )
+                .groupBy(musculo.grupo_muscular)
+                .orderBy(desc(sql`count(${sessao_serie.id})`), asc(musculo.grupo_muscular));
+
+            const totalSeries = rows.reduce((acc, r) => acc + Number(r.total_series), 0);
+
+            return rows.map((r) => ({
+                grupo_muscular: r.grupo_muscular,
+                total_series: Number(r.total_series),
+                volume_total_kg: Math.round(parseFloat(r.volume_total_kg) * 100) / 100,
+                percentual: totalSeries > 0 ? Math.round((Number(r.total_series) / totalSeries) * 1000) / 10 : 0,
+            }));
+        } catch (error) {
+            throw parseDatabaseError(error, 'HistoricoRepository.getGruposMusculares');
+        }
+    }
+
+    async getExerciciosFrequentes(
+        alunoId: string,
+        dataInicio?: string,
+        dataFim?: string,
+        limite: number = 10,
+    ): Promise<ExercicioFrequenteItem[]> {
+        try {
+            const rows = await this.db
+                .select({
+                    exercicio_id: exercicio.id,
+                    nome: exercicio.nome,
+                    total_sessoes: sql<string>`count(distinct ${sessao_treino.id})`,
+                    total_series: sql<string>`count(${sessao_serie.id})`,
+                    volume_total_kg: sql<string>`coalesce(sum(
+                        case
+                            when ${sessao_serie.carga_utilizada} is not null
+                             and ${sessao_serie.repeticoes_realizadas} is not null
+                            then ${sessao_serie.carga_utilizada}::numeric * ${sessao_serie.repeticoes_realizadas}
+                            else 0
+                        end
+                    ), 0)`,
+                })
+                .from(sessao_treino)
+                .innerJoin(sessao_exercicio, eq(sessao_exercicio.sessao_treino_id, sessao_treino.id))
+                .innerJoin(treino_exercicio, eq(sessao_exercicio.treino_exercicio_id, treino_exercicio.id))
+                .innerJoin(exercicio, eq(treino_exercicio.exercicio_id, exercicio.id))
+                .innerJoin(sessao_serie, eq(sessao_serie.sessao_exercicio_id, sessao_exercicio.id))
+                .where(
+                    and(
+                        eq(sessao_treino.aluno_id, alunoId),
+                        eq(sessao_treino.status, 'CONCLUIDA'),
+                        eq(sessao_serie.status, 'CONCLUIDA'),
+                        dataInicio ? gte(sessao_treino.inicio, new Date(dataInicio)) : undefined,
+                        dataFim ? lte(sessao_treino.inicio, new Date(dataFim)) : undefined,
+                    ),
+                )
+                .groupBy(exercicio.id, exercicio.nome)
+                .orderBy(desc(sql`count(distinct ${sessao_treino.id})`), asc(exercicio.nome))
+                .limit(limite);
+
+            return rows.map((r) => ({
+                exercicio_id: r.exercicio_id,
+                nome: r.nome,
+                total_sessoes: Number(r.total_sessoes),
+                total_series: Number(r.total_series),
+                volume_total_kg: Math.round(parseFloat(r.volume_total_kg) * 100) / 100,
+            }));
+        } catch (error) {
+            throw parseDatabaseError(error, 'HistoricoRepository.getExerciciosFrequentes');
         }
     }
 }

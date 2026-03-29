@@ -124,3 +124,177 @@ Cada item representa uma sessão e traz os valores das séries CONCLUIDAS daquel
         422: { description: "exercicioId inválido / aluno_id obrigatório para admin/treinador / erro de validação" },
     },
 });
+
+const GrupoMuscularItemResponse = z.object({
+    grupo_muscular: z.string().openapi({ example: "PEITO" }),
+    total_series: z.number().openapi({ example: 48 }),
+    volume_total_kg: z.number().openapi({ example: 5760.0 }),
+    percentual: z.number().openapi({ example: 22.5 }),
+}).openapi("GrupoMuscularItem");
+
+const ExercicioFrequenteItemResponse = z.object({
+    exercicio_id: z.string().uuid().openapi({ example: "550e8400-e29b-41d4-a716-446655440003" }),
+    nome: z.string().openapi({ example: "Supino Reto" }),
+    total_sessoes: z.number().openapi({ example: 12 }),
+    total_series: z.number().openapi({ example: 48 }),
+    volume_total_kg: z.number().openapi({ example: 5760.0 }),
+}).openapi("ExercicioFrequenteItem");
+
+const PeriodoComparativoResponse = EstatisticasResponse.omit({
+    sequencia_atual: true,
+    melhor_sequencia: true,
+}).openapi("PeriodoComparativo");
+
+const ComparativoResponse = z.object({
+    periodo_atual_inicio: z.string().openapi({ example: "2026-02-27T00:00:00.000Z" }),
+    periodo_atual_fim: z.string().openapi({ example: "2026-03-27T00:00:00.000Z" }),
+    periodo_anterior_inicio: z.string().openapi({ example: "2026-01-28T00:00:00.000Z" }),
+    periodo_anterior_fim: z.string().openapi({ example: "2026-02-27T00:00:00.000Z" }),
+    periodo_atual: PeriodoComparativoResponse,
+    periodo_anterior: PeriodoComparativoResponse,
+    variacao: z.object({
+        sessoes_concluidas_pct: z.number().nullable().openapi({ example: 25.0 }),
+        sessoes_concluidas_abs: z.number().openapi({ example: 2 }),
+        volume_total_kg_pct: z.number().nullable().openapi({ example: 12.5 }),
+        volume_total_kg_abs: z.number().openapi({ example: 1680.0 }),
+        media_duracao_minutos_pct: z.number().nullable().openapi({ example: -5.0 }),
+        media_duracao_minutos_abs: z.number().openapi({ example: -3 }),
+        treinos_por_semana_pct: z.number().nullable().openapi({ example: 33.3 }),
+        treinos_por_semana_abs: z.number().openapi({ example: 0.8 }),
+    }),
+}).openapi("HistoricoComparativo");
+
+// GET /historico/grupos-musculares
+historicoRegistry.registerPath({
+    method: "get",
+    path: "/historico/grupos-musculares",
+    summary: "Distribuição de séries por grupo muscular",
+    description: `Retorna quantas séries CONCLUIDAS o aluno realizou por grupo muscular no período, com volume e percentual de cada grupo.
+
+**Importante:** exercícios que ativam múltiplos grupos musculares (ex: Supino Reto → PEITO + BRAÇOS) contam uma série para cada grupo. Por isso, a soma de \`total_series\` de todos os grupos pode exceder o total real de séries realizadas. Use \`percentual\` para proporção relativa entre grupos, não como fração do total absoluto.
+
+**Ordenação:** total de séries desc, grupo_muscular asc em caso de empate.
+
+Exercícios sem músculos cadastrados não aparecem.
+
+**Controle de acesso:** mesmo modelo de \`/historico/estatisticas\`.`,
+    tags: ["Historico"],
+    security: [{ BearerAuth: [] }],
+    request: {
+        query: z.object({
+            aluno_id: z.string().uuid().optional().openapi({ example: "550e8400-e29b-41d4-a716-446655440001", description: "Filtra por aluno (obrigatório para admin e treinador)" }),
+            data_inicio: z.string().optional().openapi({ example: "2026-01-01T00:00:00.000Z", description: "Início do período (ISO 8601)" }),
+            data_fim: z.string().optional().openapi({ example: "2026-03-31T23:59:59.999Z", description: "Fim do período (ISO 8601)" }),
+        }),
+    },
+    responses: {
+        200: {
+            description: "Distribuição por grupo muscular",
+            content: {
+                "application/json": {
+                    schema: z.object({
+                        error: z.boolean().openapi({ example: false }),
+                        code: z.number().openapi({ example: 200 }),
+                        message: z.string().nullable().openapi({ example: null }),
+                        data: z.array(GrupoMuscularItemResponse),
+                        errors: z.array(z.any()),
+                    }),
+                },
+            },
+        },
+        401: { description: "Não autorizado" },
+        403: { description: "Sem permissão para visualizar este histórico" },
+        422: { description: "aluno_id obrigatório para admin/treinador / erro de validação" },
+    },
+});
+
+// GET /historico/exercicios-frequentes
+historicoRegistry.registerPath({
+    method: "get",
+    path: "/historico/exercicios-frequentes",
+    summary: "Exercícios mais treinados no período",
+    description: `Retorna os exercícios que o aluno mais realizou em sessões CONCLUIDAS, ordenados por número de sessões.
+
+Útil para: seção "seus exercícios favoritos" no perfil do aluno.
+
+**Controle de acesso:** mesmo modelo de \`/historico/estatisticas\`.`,
+    tags: ["Historico"],
+    security: [{ BearerAuth: [] }],
+    request: {
+        query: z.object({
+            aluno_id: z.string().uuid().optional().openapi({ example: "550e8400-e29b-41d4-a716-446655440001", description: "Filtra por aluno (obrigatório para admin e treinador)" }),
+            data_inicio: z.string().optional().openapi({ example: "2026-01-01T00:00:00.000Z", description: "Início do período (ISO 8601)" }),
+            data_fim: z.string().optional().openapi({ example: "2026-03-31T23:59:59.999Z", description: "Fim do período (ISO 8601)" }),
+            limite: z.string().optional().openapi({ example: "10", description: "Máximo de exercícios retornados (padrão: 10, máx: 50)" }),
+        }),
+    },
+    responses: {
+        200: {
+            description: "Exercícios mais frequentes",
+            content: {
+                "application/json": {
+                    schema: z.object({
+                        error: z.boolean().openapi({ example: false }),
+                        code: z.number().openapi({ example: 200 }),
+                        message: z.string().nullable().openapi({ example: null }),
+                        data: z.array(ExercicioFrequenteItemResponse),
+                        errors: z.array(z.any()),
+                    }),
+                },
+            },
+        },
+        401: { description: "Não autorizado" },
+        403: { description: "Sem permissão para visualizar este histórico" },
+        422: { description: "aluno_id obrigatório para admin/treinador / erro de validação" },
+    },
+});
+
+// GET /historico/comparativo
+historicoRegistry.registerPath({
+    method: "get",
+    path: "/historico/comparativo",
+    summary: "Comparativo entre período atual e período anterior",
+    description: `Compara as estatísticas do período atual (últimas N semanas) com o período imediatamente anterior (N semanas antes disso).
+
+Os campos \`periodo_atual_inicio/fim\` e \`periodo_anterior_inicio/fim\` retornam as datas exatas de cada janela para exibição de legenda na UI.
+
+**Campos de variação** (inclui percentual e absoluto):
+- Valor positivo = melhora (ex: +25% = treinou 25% mais, +2 = 2 sessões a mais)
+- Valor negativo = queda
+- \`*_pct = null\` = período anterior sem dados (divisão por zero evitada)
+
+**Nota:** \`sequencia_atual\` e \`melhor_sequencia\` são omitidas de \`periodo_atual\` e \`periodo_anterior\` — streak é uma métrica global e não faz sentido segmentada por janela de tempo. Consulte \`GET /historico/estatisticas\` para obter streaks.
+
+**Exemplo com semanas=4:**
+- Período atual: últimas 4 semanas
+- Período anterior: 4 semanas antes disso (semanas 5 a 8 atrás)
+
+**Controle de acesso:** mesmo modelo de \`/historico/estatisticas\`.`,
+    tags: ["Historico"],
+    security: [{ BearerAuth: [] }],
+    request: {
+        query: z.object({
+            aluno_id: z.string().uuid().optional().openapi({ example: "550e8400-e29b-41d4-a716-446655440001", description: "Filtra por aluno (obrigatório para admin e treinador)" }),
+            semanas: z.string().optional().openapi({ example: "4", description: "Número de semanas de cada período (padrão: 4, máx: 52)" }),
+        }),
+    },
+    responses: {
+        200: {
+            description: "Comparativo entre períodos",
+            content: {
+                "application/json": {
+                    schema: z.object({
+                        error: z.boolean().openapi({ example: false }),
+                        code: z.number().openapi({ example: 200 }),
+                        message: z.string().nullable().openapi({ example: null }),
+                        data: ComparativoResponse,
+                        errors: z.array(z.any()),
+                    }),
+                },
+            },
+        },
+        401: { description: "Não autorizado" },
+        403: { description: "Sem permissão para visualizar este histórico" },
+        422: { description: "aluno_id obrigatório para admin/treinador / erro de validação" },
+    },
+});
