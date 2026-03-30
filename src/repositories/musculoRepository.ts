@@ -91,6 +91,8 @@ class MusculoRepository {
             }
 
             // Contagem total por grupo
+            const TODOS_GRUPOS = ['PEITO', 'COSTAS', 'PERNAS', 'BRAÇOS', 'OMBROS', 'ABDOMEN'] as const;
+
             const contagemRaw = await this.db
                 .select({
                     grupo_muscular: musculo.grupo_muscular,
@@ -100,8 +102,11 @@ class MusculoRepository {
                 .groupBy(musculo.grupo_muscular);
 
             const contagem_por_grupo: Record<string, number> = Object.fromEntries(
-                contagemRaw.map((r) => [r.grupo_muscular, Number(r.total)])
+                TODOS_GRUPOS.map((g) => [g, 0])
             );
+            for (const r of contagemRaw) {
+                contagem_por_grupo[r.grupo_muscular] = Number(r.total);
+            }
 
             return { dados, total, page, limite, totalPages: Math.ceil(total / limite), contagem_por_grupo };
         } catch (error) {

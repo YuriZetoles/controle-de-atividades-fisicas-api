@@ -93,6 +93,6 @@ const treinadorQuerySchema = z.object({
         .transform((val) => (val ? parseInt(val, 10) : 10))
         .refine((val) => Number.isInteger(val) && val > 0 && val <= 100, { message: 'limite deve ser entre 1 e 100' })
         .openapi({ description: "Limite de resultados por página (máx. 100)", example: "10" }),
-}).openapi("TreinadorQuery");
+}).strict().openapi("TreinadorQuery");
 
 export { treinadorIdSchema, treinadorSchema, treinadorCreateSchema, treinadorQuerySchema };

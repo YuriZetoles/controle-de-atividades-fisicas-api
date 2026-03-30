@@ -55,7 +55,7 @@ const musculoQuerySchema = z.object({
             message: 'limite deve ser entre 1 e 100',
         })
         .openapi({ description: "Limite de resultados por página (máx. 100)", example: "20" }),
-}).openapi("MusculoQuery");
+}).strict().openapi("MusculoQuery");
 
 const musculoIdSchema = z
     .string()
