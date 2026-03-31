@@ -18,6 +18,21 @@ export interface ResultadoPaginadoMusculo {
     contagem_por_grupo?: Record<string, number>;
 }
 
+export interface FiltrosAparelho {
+    nome?: string;
+    ordem?: 'nome_asc' | 'nome_desc' | 'popularidade_desc';
+    page?: number;
+    limite?: number;
+}
+
+export interface ResultadoPaginadoAparelho {
+    dados: { id: string; nome: string; descricao: string }[];
+    total: number;
+    page: number;
+    limite: number;
+    totalPages: number;
+}
+
 export interface FiltrosExercicio {
     nome?: string;
     grupo_muscular?: string;
@@ -36,7 +51,16 @@ export interface MusculoResumo {
     grupo_muscular: string;
 }
 
-export type ExercicioComMusculos = type_exercicio & { musculos: MusculoResumo[] };
+export interface AparelhoResumo {
+    aparelho_id: string;
+    nome: string;
+    descricao: string;
+}
+
+export type ExercicioComMusculos = type_exercicio & {
+    musculos: MusculoResumo[];
+    aparelhos: AparelhoResumo[];
+};
 
 export interface ResultadoPaginadoExercicio {
     dados: ExercicioComMusculos[];

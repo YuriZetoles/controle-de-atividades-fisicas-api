@@ -8,6 +8,7 @@ import { treinoRegistry } from "./treinoDoc";
 import { sessaoRegistry } from "./sessaoDoc";
 import { historicoRegistry } from "./historicoDoc";
 import { musculoRegistry } from "./musculoDoc";
+import { aparelhoRegistry } from "./aparelhoDoc";
 
 const registry = new OpenAPIRegistry([
     academiaRegistry,
@@ -19,6 +20,7 @@ const registry = new OpenAPIRegistry([
     sessaoRegistry,
     historicoRegistry,
     musculoRegistry,
+    aparelhoRegistry,
 ]);
 
 registry.registerComponent("securitySchemes", "BearerAuth", {
@@ -50,5 +52,6 @@ export const openApiDocument = generator.generateDocument({
         { name: "Sessao", description: "Sessões de treino" },
         { name: "Historico", description: "Histórico e estatísticas de treinos" },
         { name: "Musculo", description: "Listagem de músculos" },
+        { name: "Aparelho", description: "Listagem de aparelhos de academia" },
     ],
 });
