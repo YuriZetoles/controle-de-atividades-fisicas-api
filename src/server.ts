@@ -17,6 +17,7 @@ import treinoRoutes from './routes/treinoRoutes';
 import sessaoRoutes from './routes/sessaoRoutes';
 import historicoRoutes from './routes/historicoRoutes';
 import musculoRoutes from './routes/musculoRoutes';
+import aparelhoRoutes from './routes/aparelhoRoutes';
 import authRoutes from "./routes/authRoutes";
 
 dotenv.config();
@@ -81,6 +82,7 @@ app.use('/api', treinoRoutes);
 app.use('/api', sessaoRoutes);
 app.use('/api', historicoRoutes);
 app.use('/api', musculoRoutes);
+app.use('/api', aparelhoRoutes);
 app.use('/api', authRoutes);
 
 //função para iniciar o servidor
