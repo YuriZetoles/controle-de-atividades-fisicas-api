@@ -80,6 +80,10 @@ class SessaoService {
 
         const perfil = await this.usuarioRepository.buscarPerfilAcesso(userId);
 
+        if (!perfil.isAdmin && !perfil.isAluno && !perfil.isTreinador) {
+            throw new Error('FORBIDDEN: perfil de acesso não autorizado');
+        }
+
         if (!perfil.isAdmin) {
             if (perfil.isAluno && perfil.alunoId !== sessao.aluno_id) {
                 throw new Error('FORBIDDEN: você não tem permissão para visualizar esta sessão');
@@ -162,6 +166,10 @@ class SessaoService {
 
         const perfil = await this.usuarioRepository.buscarPerfilAcesso(userId);
 
+        if (!perfil.isAdmin && !perfil.isAluno && !perfil.isTreinador) {
+            throw new Error('FORBIDDEN: perfil de acesso não autorizado');
+        }
+
         if (!perfil.isAdmin) {
             if (perfil.isAluno && perfil.alunoId !== sessaoStatus.aluno_id) {
                 throw new Error('FORBIDDEN: você não tem permissão para atualizar esta sessão');
@@ -199,6 +207,10 @@ class SessaoService {
         }
 
         const perfil = await this.usuarioRepository.buscarPerfilAcesso(userId);
+
+        if (!perfil.isAdmin && !perfil.isAluno && !perfil.isTreinador) {
+            throw new Error('FORBIDDEN: perfil de acesso não autorizado');
+        }
 
         if (!perfil.isAdmin) {
             if (perfil.isAluno && perfil.alunoId !== sessaoStatus.aluno_id) {
@@ -244,6 +256,10 @@ class SessaoService {
 
     private async _verificarAcessoSessao(userId: string, sessaoAlunoId: string): Promise<void> {
         const perfil = await this.usuarioRepository.buscarPerfilAcesso(userId);
+
+        if (!perfil.isAdmin && !perfil.isAluno && !perfil.isTreinador) {
+            throw new Error('FORBIDDEN: perfil de acesso não autorizado');
+        }
 
         if (!perfil.isAdmin) {
             if (perfil.isAluno && perfil.alunoId !== sessaoAlunoId) {
@@ -398,6 +414,10 @@ class SessaoService {
         }
 
         const perfil = await this.usuarioRepository.buscarPerfilAcesso(userId);
+
+        if (!perfil.isAdmin && !perfil.isAluno && !perfil.isTreinador) {
+            throw new Error('FORBIDDEN: perfil de acesso não autorizado');
+        }
 
         if (!perfil.isAdmin) {
             if (perfil.isAluno && perfil.alunoId !== sessao.aluno_id) {
