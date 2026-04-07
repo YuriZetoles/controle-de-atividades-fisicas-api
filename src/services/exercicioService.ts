@@ -189,7 +189,7 @@ class ExercicioService {
             throw new Error('Exercício não encontrado');
         }
 
-        // Exercício pessoal: apenas o dono ou admin pode visualizar
+        // Exercício pessoal: apenas o dono, qualquer treinador ou admin pode visualizar
         if (exercicioEncontrado.aluno_id) {
             const perfil = await this.usuarioRepository.buscarPerfilAcesso(userId);
             const treinadorComAcesso = !perfil.isAdmin && perfil.isTreinador
