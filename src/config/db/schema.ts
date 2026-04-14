@@ -7,6 +7,7 @@ export const tipoAtivacaoEnum = pgEnum('tipo_ativacao', ['PRIMARIO', 'SECUNDARIO
 export const turnoEnum = pgEnum('turno', ['MANHA', 'TARDE', 'NOITE']);
 export const grupoMuscularEnum = pgEnum('grupo_muscular', ['PEITO', 'COSTAS', 'PERNAS', 'BRAÇOS', 'OMBROS', 'ABDOMEN']);
 export const diaSemanaEnum = pgEnum('dia_semana', ['SEGUNDA', 'TERCA', 'QUARTA', 'QUINTA', 'SEXTA', 'SABADO', 'DOMINGO']);
+export const remetenteTipoEnum = pgEnum('remetente_tipo', ['ALUNO', 'TREINADOR']);
 
 // Tabelas do BetterAuth (autenticação)
 export const user = pgTable('user', {
@@ -101,6 +102,7 @@ export const aluno = pgTable('aluno', {
     status_conta: boolean('status_conta').notNull().default(true),
     created_at: timestamp('created_at').defaultNow().notNull(),
     academia_id: uuid('academia_id').notNull().references(() => academia.id),
+    treinador_id: uuid('treinador_id').references(() => treinador.id),
 });
 
 export const aluno_academia = pgTable('aluno_academia', {
@@ -142,6 +144,29 @@ export const treinador_academia = pgTable('treinador_academia', {
 }, (table) => [
     primaryKey({ columns: [table.treinador_id, table.academia_id] })
 ]);
+
+export const conversa = pgTable('conversa', {
+    id: uuid('id').defaultRandom().primaryKey(),
+    treinador_id: uuid('treinador_id').notNull().references(() => treinador.id),
+    aluno_id: uuid('aluno_id').notNull().references(() => aluno.id),
+    ativa: boolean('ativa').notNull().default(true),
+    ultima_mensagem_em: timestamp('ultima_mensagem_em'),
+    created_at: timestamp('created_at').defaultNow().notNull(),
+}, (table) => [
+    uniqueIndex('conversa_treinador_aluno_unique').on(table.treinador_id, table.aluno_id),
+]);
+
+export const mensagem_conversa = pgTable('mensagem_conversa', {
+    id: uuid('id').defaultRandom().primaryKey(),
+    conversa_id: uuid('conversa_id').notNull().references(() => conversa.id, { onDelete: 'cascade' }),
+    remetente_tipo: remetenteTipoEnum('remetente_tipo').notNull(),
+    remetente_user_id: text('remetente_user_id').notNull().references(() => user.id, { onDelete: 'cascade' }),
+    conteudo: text('conteudo').notNull(),
+    enviada_em: timestamp('enviada_em').defaultNow().notNull(),
+    lida_em: timestamp('lida_em'),
+    lida_por_user_id: text('lida_por_user_id').references(() => user.id, { onDelete: 'set null' }),
+    ativa: boolean('ativa').notNull().default(true),
+});
 
 export const musculo = pgTable('musculo', {
     id: uuid('id').defaultRandom().primaryKey(),
@@ -220,6 +245,10 @@ export const alunoRelations = relations(aluno, ({ one, many }) => ({
         fields: [aluno.academia_id],
         references: [academia.id],
     }),
+    treinadorVinculado: one(treinador, {
+        fields: [aluno.treinador_id],
+        references: [treinador.id],
+    }),
     alunoAcademias: many(aluno_academia),
     avaliacoesFisicas: many(avaliacao_fisica),
     treinos: many(treino),
@@ -258,6 +287,7 @@ export const treinadorRelations = relations(treinador, ({ one, many }) => ({
     }),
     treinadorAcademias: many(treinador_academia),
     treinosCriados: many(treino),
+    alunosVinculados: many(aluno),
 }));
 
 // 4.1. Treinador <-> Academia
@@ -269,6 +299,35 @@ export const treinadorAcademiaRelations = relations(treinador_academia, ({ one }
     academia: one(academia, {
         fields: [treinador_academia.academia_id],
         references: [academia.id],
+    }),
+}));
+
+// 4.2. Conversa
+export const conversaRelations = relations(conversa, ({ one, many }) => ({
+    treinador: one(treinador, {
+        fields: [conversa.treinador_id],
+        references: [treinador.id],
+    }),
+    aluno: one(aluno, {
+        fields: [conversa.aluno_id],
+        references: [aluno.id],
+    }),
+    mensagens: many(mensagem_conversa),
+}));
+
+// 4.3. Mensagens da Conversa
+export const mensagemConversaRelations = relations(mensagem_conversa, ({ one }) => ({
+    conversa: one(conversa, {
+        fields: [mensagem_conversa.conversa_id],
+        references: [conversa.id],
+    }),
+    remetente: one(user, {
+        fields: [mensagem_conversa.remetente_user_id],
+        references: [user.id],
+    }),
+    leitor: one(user, {
+        fields: [mensagem_conversa.lida_por_user_id],
+        references: [user.id],
     }),
 }));
 

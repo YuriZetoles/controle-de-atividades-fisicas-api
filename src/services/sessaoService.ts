@@ -80,6 +80,10 @@ class SessaoService {
 
         const perfil = await this.usuarioRepository.buscarPerfilAcesso(userId);
 
+        if (!perfil.isAdmin && !perfil.isAluno && !perfil.isTreinador) {
+            throw new Error('FORBIDDEN: perfil de acesso não autorizado');
+        }
+
         if (!perfil.isAdmin) {
             if (perfil.isAluno && perfil.alunoId !== sessao.aluno_id) {
                 throw new Error('FORBIDDEN: você não tem permissão para visualizar esta sessão');
@@ -123,13 +127,13 @@ class SessaoService {
             if (alunosDoTreinador.length === 0) {
                 return { dados: [], total: 0, page: filtros.page, limite: filtros.limite, totalPages: 0 };
             }
-            const alunoIds = filtros.aluno_id
-                ? (alunosDoTreinador.includes(filtros.aluno_id) ? [filtros.aluno_id] : null)
-                : alunosDoTreinador;
-
-            if (alunoIds === null) {
+            if (filtros.aluno_id && !alunosDoTreinador.includes(filtros.aluno_id)) {
                 return { dados: [], total: 0, page: filtros.page, limite: filtros.limite, totalPages: 0 };
             }
+
+            const alunoIds = filtros.aluno_id
+                ? [filtros.aluno_id]
+                : alunosDoTreinador;
 
             return this.repository.findAll(filtros, alunoIds);
         }
@@ -161,6 +165,10 @@ class SessaoService {
         }
 
         const perfil = await this.usuarioRepository.buscarPerfilAcesso(userId);
+
+        if (!perfil.isAdmin && !perfil.isAluno && !perfil.isTreinador) {
+            throw new Error('FORBIDDEN: perfil de acesso não autorizado');
+        }
 
         if (!perfil.isAdmin) {
             if (perfil.isAluno && perfil.alunoId !== sessaoStatus.aluno_id) {
@@ -199,6 +207,10 @@ class SessaoService {
         }
 
         const perfil = await this.usuarioRepository.buscarPerfilAcesso(userId);
+
+        if (!perfil.isAdmin && !perfil.isAluno && !perfil.isTreinador) {
+            throw new Error('FORBIDDEN: perfil de acesso não autorizado');
+        }
 
         if (!perfil.isAdmin) {
             if (perfil.isAluno && perfil.alunoId !== sessaoStatus.aluno_id) {
@@ -244,6 +256,10 @@ class SessaoService {
 
     private async _verificarAcessoSessao(userId: string, sessaoAlunoId: string): Promise<void> {
         const perfil = await this.usuarioRepository.buscarPerfilAcesso(userId);
+
+        if (!perfil.isAdmin && !perfil.isAluno && !perfil.isTreinador) {
+            throw new Error('FORBIDDEN: perfil de acesso não autorizado');
+        }
 
         if (!perfil.isAdmin) {
             if (perfil.isAluno && perfil.alunoId !== sessaoAlunoId) {
@@ -398,6 +414,10 @@ class SessaoService {
         }
 
         const perfil = await this.usuarioRepository.buscarPerfilAcesso(userId);
+
+        if (!perfil.isAdmin && !perfil.isAluno && !perfil.isTreinador) {
+            throw new Error('FORBIDDEN: perfil de acesso não autorizado');
+        }
 
         if (!perfil.isAdmin) {
             if (perfil.isAluno && perfil.alunoId !== sessao.aluno_id) {

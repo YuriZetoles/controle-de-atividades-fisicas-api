@@ -1,4 +1,5 @@
 import express from "express";
+import { createServer } from "http";
 import dotenv from "dotenv";
 import cors from "cors";
 import chalk from "chalk";
@@ -20,6 +21,8 @@ import musculoRoutes from './routes/musculoRoutes';
 import aparelhoRoutes from './routes/aparelhoRoutes';
 import authRoutes from "./routes/authRoutes";
 import uploadRoutes from "./routes/uploadRoutes";
+import conversaRoutes from './routes/conversaRoutes';
+import { initSocketIO } from './config/socketIo';
 
 dotenv.config();
 
@@ -86,13 +89,17 @@ app.use('/api', musculoRoutes);
 app.use('/api', aparelhoRoutes);
 app.use('/api', authRoutes);
 app.use('/api', uploadRoutes);
+app.use('/api', conversaRoutes);
 
 //função para iniciar o servidor
 async function startServer() {
   try {
     console.log(chalk.blueBright("CONECTANDO AO BANCO DE DADOS..."));
     await DbConnect.connect();
-    app.listen(PORT, () => {
+    const httpServer = createServer(app);
+    initSocketIO(httpServer);
+
+    httpServer.listen(PORT, () => {
       console.log(
         chalk.cyanBright(
           `SERVIDOR RODANDO EM: \n${chalk.greenBright(`http://localhost:${PORT}/`)}`,

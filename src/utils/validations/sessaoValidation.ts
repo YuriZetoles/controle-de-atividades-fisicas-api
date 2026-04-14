@@ -157,9 +157,14 @@ const reordenarExerciciosSchema = z.object({
         .openapi({ description: "Lista de exercícios com nova ordem" }),
 }).strict().superRefine((val, ctx) => {
     const ordens = val.exercicios.map((e) => e.ordem);
-    const duplicados = ordens.filter((o, i) => ordens.indexOf(o) !== i);
-    if (duplicados.length > 0) {
-        ctx.addIssue({ code: 'custom', path: ['exercicios'], message: `ordem deve ser única. Duplicados: ${[...new Set(duplicados)].join(', ')}` });
+    const duplicadosOrdem = ordens.filter((o, i) => ordens.indexOf(o) !== i);
+    if (duplicadosOrdem.length > 0) {
+        ctx.addIssue({ code: 'custom', path: ['exercicios'], message: `ordem deve ser única. Duplicados: ${[...new Set(duplicadosOrdem)].join(', ')}` });
+    }
+    const ids = val.exercicios.map((e) => e.sessao_exercicio_id);
+    const duplicadosId = ids.filter((id, i) => ids.indexOf(id) !== i);
+    if (duplicadosId.length > 0) {
+        ctx.addIssue({ code: 'custom', path: ['exercicios'], message: `sessao_exercicio_id deve ser único. Duplicados: ${[...new Set(duplicadosId)].join(', ')}` });
     }
 }).openapi('ReordenarExerciciosInput');
 
