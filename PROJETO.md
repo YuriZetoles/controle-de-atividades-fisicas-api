@@ -121,8 +121,8 @@ Aqui estão os requisitos funcionais e não funcionais que definem o que o aplic
 
 | ID | NOME | DESCRIÇÃO | PRIORIDADE |
 | :---- | :---- | :---- | :---- |
-| RF001 | Login e Cadastro de usuátio |O sistema deve permitir cadastro e login de usuários | Alta |
-| RF002 | Login e Cadastro de usuátio |O sistema deve permitir cadastro e login de usuários | Alta |
+| RF001 | Cadastro de usuátio |O sistema deve permitir o cadastro de usuários | Alta |
+| RF002 | Login de usuátio |O sistema deve permitir o login de usuários | Alta |
 | RF003 | Tipos de usuários | O usuário deve poder se cadastrar como Aluno ou Treinador | Alta|
 | RF004 | informações de usuário |Cada perfil deve conter informações básicas (nome, foto, dados físicos no caso do aluno)| Alta|
 | RF005 | Demonstração de exercícios |  O sistema deve exibir os exercícios do treino com um GIF.| Alta|

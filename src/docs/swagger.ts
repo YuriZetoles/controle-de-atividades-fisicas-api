@@ -9,11 +9,8 @@ import { sessaoRegistry } from "./sessaoDoc";
 import { historicoRegistry } from "./historicoDoc";
 import { musculoRegistry } from "./musculoDoc";
 import { aparelhoRegistry } from "./aparelhoDoc";
-<<<<<<< HEAD
 import { uploadRegistry } from "./uploadDoc";
-=======
 import { conversaRegistry } from "./conversaDoc";
->>>>>>> 1cd4000b9f8bdbd5afa09c6922c372009eedff80
 
 const registry = new OpenAPIRegistry([
     academiaRegistry,
@@ -26,11 +23,8 @@ const registry = new OpenAPIRegistry([
     historicoRegistry,
     musculoRegistry,
     aparelhoRegistry,
-<<<<<<< HEAD
     uploadRegistry,
-=======
     conversaRegistry,
->>>>>>> 1cd4000b9f8bdbd5afa09c6922c372009eedff80
 ]);
 
 registry.registerComponent("securitySchemes", "BearerAuth", {
@@ -63,10 +57,8 @@ export const openApiDocument = generator.generateDocument({
         { name: "Historico", description: "Histórico e estatísticas de treinos" },
         { name: "Musculo", description: "Listagem de músculos" },
         { name: "Aparelho", description: "Listagem de aparelhos de academia" },
-<<<<<<< HEAD
         { name: "Upload", description: "Upload de arquivos para o bucket S3 (GarageHQ)" },
-=======
         { name: "Conversa", description: "Conversas e mensagens entre aluno e treinador" },
->>>>>>> 1cd4000b9f8bdbd5afa09c6922c372009eedff80
+        { name: "Upload", description: "Upload de arquivos para o bucket S3 (GarageHQ)" },
     ],
 });
