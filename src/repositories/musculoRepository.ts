@@ -91,7 +91,7 @@ class MusculoRepository {
             }
 
             // Contagem total por grupo
-            const TODOS_GRUPOS = ['PEITO', 'COSTAS', 'PERNAS', 'BRAÇOS', 'OMBROS', 'ABDOMEN'] as const;
+            const TODOS_GRUPOS = ['PEITO', 'COSTAS', 'PERNAS', 'BRAÇOS', 'OMBROS', 'ABDOMEN', 'PESCOÇO', 'CARDIO'] as const;
 
             const contagemRaw = await this.db
                 .select({

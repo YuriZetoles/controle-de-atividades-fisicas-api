@@ -11,7 +11,7 @@ function normalizarGrupoMuscular(val: string): string {
     return canonico[semAcento] ?? semAcento;
 }
 
-const GRUPOS_MUSCULARES = ['PEITO', 'COSTAS', 'PERNAS', 'BRAÇOS', 'OMBROS', 'ABDOMEN'] as const;
+const GRUPOS_MUSCULARES = ['PEITO', 'COSTAS', 'PERNAS', 'BRAÇOS', 'OMBROS', 'ABDOMEN', 'PESCOÇO', 'CARDIO'] as const;
 
 const musculoQuerySchema = z.object({
     nome: z

@@ -5,7 +5,7 @@ import { sql, relations } from 'drizzle-orm';
 export const sexoEnum = pgEnum('sexo', ['M', 'F']);
 export const tipoAtivacaoEnum = pgEnum('tipo_ativacao', ['PRIMARIO', 'SECUNDARIO']);
 export const turnoEnum = pgEnum('turno', ['MANHA', 'TARDE', 'NOITE']);
-export const grupoMuscularEnum = pgEnum('grupo_muscular', ['PEITO', 'COSTAS', 'PERNAS', 'BRAÇOS', 'OMBROS', 'ABDOMEN']);
+export const grupoMuscularEnum = pgEnum('grupo_muscular', ['PEITO', 'COSTAS', 'PERNAS', 'BRAÇOS', 'OMBROS', 'ABDOMEN', 'PESCOÇO', 'CARDIO']);
 export const diaSemanaEnum = pgEnum('dia_semana', ['SEGUNDA', 'TERCA', 'QUARTA', 'QUINTA', 'SEXTA', 'SABADO', 'DOMINGO']);
 export const remetenteTipoEnum = pgEnum('remetente_tipo', ['ALUNO', 'TREINADOR']);
 
