@@ -98,7 +98,7 @@ const exercicioQuerySchema = z.object({
         .optional()
         .openapi({ description: "Filtrar por nome do exercício", example: "Supino" }),
     grupo_muscular: z
-        .enum(['PEITO', 'COSTAS', 'PERNAS', 'BRAÇOS', 'OMBROS', 'ABDOMEN'])
+        .enum(['PEITO', 'COSTAS', 'PERNAS', 'BRAÇOS', 'OMBROS', 'ABDOMEN', 'PESCOÇO', 'CARDIO'])
         .optional()
         .openapi({ description: "Filtrar por grupo muscular", example: "PEITO" }),
     tipo_ativacao: z

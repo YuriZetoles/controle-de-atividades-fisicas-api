@@ -2,7 +2,7 @@ import { and, or, isNull, eq, ilike, inArray, notInArray, SQL, sql } from 'drizz
 import { DataBase } from '../../config/DbConnect';
 import { exercicio, exercicio_musculo, musculo, treino_exercicio } from '../../config/db/schema';
 
-type GrupoMuscular = 'PEITO' | 'COSTAS' | 'PERNAS' | 'BRAÇOS' | 'OMBROS' | 'ABDOMEN';
+type GrupoMuscular = 'PEITO' | 'COSTAS' | 'PERNAS' | 'BRAÇOS' | 'OMBROS' | 'ABDOMEN' | 'PESCOÇO' | 'CARDIO';
 type TipoAtivacao = 'PRIMARIO' | 'SECUNDARIO';
 
 class ExercicioFilterBuilder {

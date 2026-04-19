@@ -5,7 +5,7 @@ jest.mock('../../middlewares/authMiddleware', () => ({
 import { randomUUID } from 'crypto';
 import express from 'express';
 import request from 'supertest';
-import { describe, it, expect, beforeAll, afterAll, beforeEach } from '@jest/globals';
+import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from '@jest/globals';
 import treinoRoutes from '../../routes/treinoRoutes';
 import { DbConnect, DataBase } from '../../config/DbConnect';
 import { authMiddleware } from '../../middlewares/authMiddleware';

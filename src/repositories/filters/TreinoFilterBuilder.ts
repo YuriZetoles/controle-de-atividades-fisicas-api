@@ -2,7 +2,7 @@ import { and, arrayOverlaps, eq, ilike, inArray, isNull, SQL } from 'drizzle-orm
 import { DataBase } from '../../config/DbConnect';
 import { treino, treino_exercicio, exercicio, exercicio_musculo, musculo } from '../../config/db/schema';
 
-type GrupoMuscular = 'PEITO' | 'COSTAS' | 'PERNAS' | 'BRAÇOS' | 'OMBROS' | 'ABDOMEN';
+type GrupoMuscular = 'PEITO' | 'COSTAS' | 'PERNAS' | 'BRAÇOS' | 'OMBROS' | 'ABDOMEN' | 'PESCOÇO' | 'CARDIO';
 type TipoAtivacao = 'PRIMARIO' | 'SECUNDARIO';
 type DiaSemana = 'SEGUNDA' | 'TERCA' | 'QUARTA' | 'QUINTA' | 'SEXTA' | 'SABADO' | 'DOMINGO';
 

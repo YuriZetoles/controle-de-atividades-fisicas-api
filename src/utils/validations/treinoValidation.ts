@@ -293,7 +293,7 @@ const treinoDetalheQuerySchema = z.object({
             example: 'supino',
         }),
     grupo_muscular: z
-        .enum(['PEITO', 'COSTAS', 'PERNAS', 'BRAÇOS', 'OMBROS', 'ABDOMEN'])
+        .enum(['PEITO', 'COSTAS', 'PERNAS', 'BRAÇOS', 'OMBROS', 'ABDOMEN', 'PESCOÇO', 'CARDIO'])
         .optional()
         .openapi({
             description: 'Filtra exercícios do treino por grupo muscular',
