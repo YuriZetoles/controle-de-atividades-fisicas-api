@@ -4,12 +4,20 @@ jest.mock('../../middlewares/authMiddleware', () => ({
 jest.mock('../../middlewares/adminMiddleware', () => ({
     adminMiddleware: jest.fn((_req: any, _res: any, next: any) => next()),
 }));
+jest.mock('../../services/uploadService', () => ({
+    __esModule: true,
+    default: jest.fn().mockImplementation(() => ({
+        uploadFiles: jest.fn<() => Promise<{ url: string }[]>>().mockResolvedValue([{ url: 'http://test-s3.local/animacoes/test.gif' }]),
+        deleteFile: jest.fn<() => Promise<void>>().mockResolvedValue(),
+    })),
+}));
 
 import { randomUUID } from 'crypto';
 import express from 'express';
 import request from 'supertest';
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from '@jest/globals';
 import exercicioRoutes from '../../routes/exercicioRoutes';
+import { globalErrorHandler } from '../../middlewares/globalErrorHandler';
 import { DbConnect, DataBase } from '../../config/DbConnect';
 import { authMiddleware } from '../../middlewares/authMiddleware';
 import {
@@ -156,6 +164,7 @@ beforeAll(async () => {
     await DbConnect.connect();
     app.use(express.json());
     app.use('/api', exercicioRoutes);
+    app.use(globalErrorHandler);
 
     // Academia
     const [ac] = await DataBase.insert(academia).values({
@@ -1595,5 +1604,112 @@ describe('DELETE /exercicios/:id', () => {
         const res = await request(app).delete(`/api/exercicios/${exId}`);
 
         expect(res.status).toBe(401);
+    });
+});
+
+// ── Upload de animação (GIF/WebM via multipart) ──────────────────────────────
+
+// Buffer mínimo de GIF87a válido (header + logical screen + color table + trailer)
+const GIF_BUFFER = Buffer.from(
+    '474946383761010001008000FF0000FFFFFF2C00000000010001000002024401003B',
+    'hex',
+);
+// Buffer com mimetype inválido (simula JPEG)
+const JPEG_BUFFER = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10]);
+
+describe('POST /exercicios – upload de animação', () => {
+    const criados: string[] = [];
+
+    afterEach(async () => {
+        for (const id of criados) await dbDeletarExercicio(id);
+        criados.length = 0;
+    });
+
+    it('admin envia GIF válido via multipart → 201 com animacao_url preenchida', async () => {
+        asAdmin();
+        const res = await request(app)
+            .post('/api/exercicios')
+            .field('data', JSON.stringify({ nome: `Upload GIF ${RUN_ID}`, musculos: [{ musculo_id: musculoId, tipo_ativacao: 'PRIMARIO' }] }))
+            .attach('animacao', GIF_BUFFER, { filename: 'teste.gif', contentType: 'image/gif' });
+
+        expect(res.status).toBe(201);
+        expect(res.body.data.animacao_url).toBe('http://test-s3.local/animacoes/test.gif');
+        if (res.body.data?.id) criados.push(res.body.data.id);
+    });
+
+    it('admin envia WebM válido via multipart → 201 com animacao_url preenchida', async () => {
+        asAdmin();
+        const webmBuffer = Buffer.from([0x1a, 0x45, 0xdf, 0xa3, 0x01]);
+        const res = await request(app)
+            .post('/api/exercicios')
+            .field('data', JSON.stringify({ nome: `Upload WebM ${RUN_ID}`, musculos: [{ musculo_id: musculoId, tipo_ativacao: 'PRIMARIO' }] }))
+            .attach('animacao', webmBuffer, { filename: 'teste.webm', contentType: 'video/webm' });
+
+        expect(res.status).toBe(201);
+        expect(res.body.data.animacao_url).toBe('http://test-s3.local/animacoes/test.gif');
+        if (res.body.data?.id) criados.push(res.body.data.id);
+    });
+
+    it('mimetype inválido (JPEG) → 400 com mensagem de tipo não permitido', async () => {
+        asAdmin();
+        const res = await request(app)
+            .post('/api/exercicios')
+            .field('data', JSON.stringify({ nome: `Upload JPEG ${RUN_ID}`, musculos: [{ musculo_id: musculoId, tipo_ativacao: 'PRIMARIO' }] }))
+            .attach('animacao', JPEG_BUFFER, { filename: 'foto.jpg', contentType: 'image/jpeg' });
+
+        expect(res.status).toBe(400);
+        expect(res.body.message).toMatch(/\.webm e \.gif são permitidos/i);
+    });
+
+    it('arquivo maior que o limite → 400 com mensagem de tamanho excedido', async () => {
+        // Cria um mini-app isolado com limite de 1 byte para forçar LIMIT_FILE_SIZE
+        const multerModule = await import('multer');
+        const multerFn = multerModule.default;
+        const tinyApp = express();
+        const tinyUpload = multerFn({ storage: multerFn.memoryStorage(), limits: { fileSize: 1 } });
+        tinyApp.post('/test-size',
+            tinyUpload.single('animacao'),
+            (_req, res) => res.status(200).end(),
+        );
+        tinyApp.use(globalErrorHandler);
+
+        const res = await request(tinyApp)
+            .post('/test-size')
+            .attach('animacao', GIF_BUFFER, { filename: 'grande.gif', contentType: 'image/gif' });
+
+        expect(res.status).toBe(400);
+        expect(res.body.message).toMatch(/tamanho máximo/i);
+    });
+});
+
+describe('PATCH /exercicios/:id – troca de animação', () => {
+    let exId: string;
+
+    beforeEach(async () => {
+        exId = await dbCriarExercicioGlobal(`Animacao Patch ${RUN_ID} ${Date.now()}`);
+    });
+
+    afterEach(async () => {
+        await dbDeletarExercicio(exId);
+    });
+
+    it('admin envia novo GIF → 200 com animacao_url atualizada', async () => {
+        asAdmin();
+        const res = await request(app)
+            .patch(`/api/exercicios/${exId}`)
+            .attach('animacao', GIF_BUFFER, { filename: 'novo.gif', contentType: 'image/gif' });
+
+        expect(res.status).toBe(200);
+        expect(res.body.data.animacao_url).toBe('http://test-s3.local/animacoes/test.gif');
+    });
+
+    it('mimetype inválido no PATCH → 400', async () => {
+        asAdmin();
+        const res = await request(app)
+            .patch(`/api/exercicios/${exId}`)
+            .attach('animacao', JPEG_BUFFER, { filename: 'foto.jpg', contentType: 'image/jpeg' });
+
+        expect(res.status).toBe(400);
+        expect(res.body.message).toMatch(/\.webm e \.gif são permitidos/i);
     });
 });

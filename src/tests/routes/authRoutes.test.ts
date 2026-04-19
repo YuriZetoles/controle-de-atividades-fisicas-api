@@ -1,5 +1,5 @@
 import { randomUUID } from 'crypto';
-import { spawn, ChildProcessWithoutNullStreams } from 'child_process';
+import { spawn, ChildProcess } from 'child_process';
 import request from 'supertest';
 import { inArray } from 'drizzle-orm';
 import { describe, it, expect, beforeAll, afterAll } from '@jest/globals';
@@ -11,7 +11,7 @@ const ORIGIN = 'http://localhost:3000';
 const TEST_PORT = 1450;
 const BASE_URL = `http://localhost:${TEST_PORT}`;
 
-let serverProcess: ChildProcessWithoutNullStreams | null = null;
+let serverProcess: ChildProcess | null = null;
 const createdEmails = new Set<string>();
 
 type AuthUserPayload = {
@@ -115,7 +115,7 @@ async function stopServer(): Promise<void> {
     if (serverProcess.exitCode !== null) return;
 
     await new Promise<void>((resolve) => {
-        const proc = serverProcess;
+        const proc = serverProcess!;
         const timeout = setTimeout(() => {
             if (proc.exitCode === null) {
                 proc.kill('SIGKILL');
