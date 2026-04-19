@@ -5,14 +5,20 @@ import { authMiddleware } from '../middlewares/authMiddleware';
 
 const router = express.Router();
 
+const maxFileSizeMb = Number(process.env.UPLOAD_MAX_FILE_SIZE_MB || '20');
+
 const storage = multer.memoryStorage();
 const upload = multer({
     storage,
+    limits: {
+        fileSize: maxFileSizeMb * 1024 * 1024,
+    },
     fileFilter: (_req, file, cb) => {
-        if (file.mimetype === 'video/webm') {
+        const tiposPermitidos = ['video/webm', 'image/gif'];
+        if (tiposPermitidos.includes(file.mimetype)) {
             cb(null, true);
         } else {
-            cb(new Error('Apenas arquivos .webm são permitidos'));
+            cb(new Error('Apenas arquivos .webm e .gif são permitidos'));
         }
     }
 });

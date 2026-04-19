@@ -12,6 +12,10 @@ const ExercicioResponse = z.object({
     id: z.string().uuid().openapi({ example: "550e8400-e29b-41d4-a716-446655440000" }),
     nome: z.string().openapi({ example: "Supino Reto" }),
     descricao: z.string().nullable().openapi({ example: "Exercício para peitorais" }),
+    animacao_url: z.string().nullable().openapi({
+        description: "URL pública da animação (WebM ou GIF) hospedada no GarageHQ S3",
+        example: "https://spotter.web.fslab.dev/animacoes/1713020123456-uuid.webm",
+    }),
     aluno_id: z.string().uuid().nullable().openapi({ example: null }),
     deletado_em: z.coerce.date().nullable().openapi({ example: null }),
     musculos: z.array(z.object({
@@ -27,12 +31,37 @@ const ExercicioResponse = z.object({
     })).openapi({ description: "Aparelhos necessários para o exercício" }),
 }).openapi("Exercicio");
 
+// Schema do multipart/form-data — campo 'data' (JSON stringificado) + 'animacao' (arquivo WebM/GIF)
+const MultipartCreateBody = z.object({
+    data: z.string().openapi({
+        description: "JSON stringificado com os campos do exercício (mesmos campos do ExercicioInput)",
+        example: '{"nome":"Supino Reto","musculos":[{"musculo_id":"<uuid>","tipo_ativacao":"PRIMARIO"}]}',
+    }),
+    animacao: z.any().openapi({
+        description: "Arquivo de animação (video/webm ou image/gif, até UPLOAD_MAX_FILE_SIZE_MB)",
+        type: "string",
+        format: "binary",
+    } as any),
+}).openapi("ExercicioMultipartCreate");
+
+const MultipartUpdateBody = z.object({
+    data: z.string().optional().openapi({
+        description: "JSON stringificado com campos parciais. Para remover a animação envie animacao_url=null.",
+        example: '{"nome":"Supino Inclinado"}',
+    }),
+    animacao: z.any().optional().openapi({
+        description: "Arquivo de animação opcional (video/webm ou image/gif)",
+        type: "string",
+        format: "binary",
+    } as any),
+}).openapi("ExercicioMultipartUpdate");
+
 // POST /exercicios
 exercicioRegistry.registerPath({
     method: "post",
     path: "/exercicios",
     summary: "Criar exercício",
-    description: "Cria um novo exercício. Admin pode criar exercícios globais (sem aluno_id). Aluno pode criar exercícios pessoais apenas para si mesmo. Treinador pode criar exercícios pessoais para qualquer aluno existente.",
+    description: "Cria um novo exercício. Admin pode criar exercícios globais (sem aluno_id). Aluno pode criar exercícios pessoais apenas para si mesmo. Treinador pode criar exercícios pessoais para qualquer aluno existente. Aceita multipart/form-data com arquivo .webm ou .gif no campo `animacao`; os campos do exercício vão em `data` como JSON stringificado. Também aceita application/json puro (sem upload).",
     tags: ["Exercicio"],
     security: [{ BearerAuth: [] }],
     request: {
@@ -40,6 +69,7 @@ exercicioRegistry.registerPath({
             required: true,
             content: {
                 "application/json": { schema: exercicioSchema },
+                "multipart/form-data": { schema: MultipartCreateBody },
             },
         },
     },
@@ -58,6 +88,7 @@ exercicioRegistry.registerPath({
                 },
             },
         },
+        400: { description: "Arquivo inválido (tipo não suportado ou excede limite)" },
         401: { description: "Não autorizado" },
         409: { description: "Já existe um exercício com este nome" },
         422: { description: "Erro de validação" },
@@ -132,7 +163,7 @@ exercicioRegistry.registerPath({
     method: "patch",
     path: "/exercicios/{id}",
     summary: "Atualizar exercício",
-    description: "Atualiza parcialmente um exercício. Ao informar musculos, a lista completa de vínculos musculares é substituída — envie todos os músculos desejados, não apenas os novos. O mesmo vale para aparelhos: ao informar aparelhos, todos os vínculos existentes são substituídos (array vazio remove todos). Exercícios globais: somente admin. Exercícios pessoais: dono (aluno), treinador ou admin.",
+    description: "Atualiza parcialmente um exercício. Ao informar musculos, a lista completa de vínculos musculares é substituída — envie todos os músculos desejados, não apenas os novos. O mesmo vale para aparelhos: ao informar aparelhos, todos os vínculos existentes são substituídos (array vazio remove todos). Exercícios globais: somente admin. Exercícios pessoais: dono (aluno), treinador ou admin. Aceita multipart/form-data para substituir/remover a animação. Para remover explicitamente envie `animacao_url: null` no JSON de `data` — a animação antiga é apagada do S3.",
     tags: ["Exercicio"],
     security: [{ BearerAuth: [] }],
     request: {
@@ -141,6 +172,7 @@ exercicioRegistry.registerPath({
             required: true,
             content: {
                 "application/json": { schema: exercicioUpdateSchema },
+                "multipart/form-data": { schema: MultipartUpdateBody },
             },
         },
     },
@@ -159,6 +191,7 @@ exercicioRegistry.registerPath({
                 },
             },
         },
+        400: { description: "Arquivo inválido (tipo não suportado ou excede limite)" },
         401: { description: "Não autorizado" },
         403: { description: "Sem permissão para editar este exercício" },
         404: { description: "Exercício não encontrado" },
@@ -180,14 +213,16 @@ exercicioRegistry.registerPath({
 - ?soft=true — Desativa o exercício sem removê-lo (soft delete). As rotinas existentes são preservadas.
 - ?force=true — Exclui permanentemente o exercício junto com todas as rotinas vinculadas. **Requer perfil admin.**
 
-Se nenhum parâmetro for informado e o exercício estiver vinculado, a requisição retornará erro 409.`,
+Se nenhum parâmetro for informado e o exercício estiver vinculado, a requisição retornará erro 409.
+
+Em exclusões definitivas (hard/cascade), a animação associada é removida do bucket S3.`,
     tags: ["Exercicio"],
     security: [{ BearerAuth: [] }],
     request: {
         params: idParam,
         query: z.object({
             soft: z.enum(["true", "false"]).optional().openapi({
-                description: "Se true, desativa o exercício sem remover do banco (soft delete). As rotinas vinculadas são preservadas.",
+                description: "Se true, desativa o exercício sem remover do banco (soft delete). As rotinas vinculadas são preservadas. A animação é mantida no S3 para permitir reativação.",
                 example: "true",
             }),
             force: z.enum(["true", "false"]).optional().openapi({
@@ -224,4 +259,3 @@ Se nenhum parâmetro for informado e o exercício estiver vinculado, a requisiç
         422: { description: "ID inválido" },
     },
 });
-
