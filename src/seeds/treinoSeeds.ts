@@ -33,7 +33,7 @@ const treinosSeed: TreinoSeedInput[] = [
                 ordem_execucao: 1,
             },
             {
-                nome: 'Tríceps Testa',
+                nome: 'Tríceps Testa com Barra EZ',
                 series: 3,
                 repeticoes: '10-12',
                 carga_sugerida: '15.00',
@@ -49,7 +49,7 @@ const treinosSeed: TreinoSeedInput[] = [
         treinadorNome: 'Marcos Antônio Rocha',
         exercicios: [
             {
-                nome: 'Agachamento Livre',
+                nome: 'Agachamento com Barra',
                 series: 4,
                 repeticoes: '8-10',
                 carga_sugerida: '40.00',
@@ -65,7 +65,7 @@ const treinosSeed: TreinoSeedInput[] = [
         treinadorNome: 'Marcos Antônio Rocha',
         exercicios: [
             {
-                nome: 'Desenvolvimento com Halteres',
+                nome: 'Desenvolvimento com Halter',
                 series: 4,
                 repeticoes: '10-12',
                 carga_sugerida: '18.00',
@@ -81,7 +81,7 @@ const treinosSeed: TreinoSeedInput[] = [
         treinadorNome: 'Fernanda Souza Almeida',
         exercicios: [
             {
-                nome: 'Agachamento Livre',
+                nome: 'Agachamento com Barra',
                 series: 3,
                 repeticoes: '12-15',
                 carga_sugerida: '25.00',
