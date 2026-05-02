@@ -26,6 +26,7 @@ const alunosSeed = [
             is_admin: false,
         },
         academiaIndex: 0,
+        treinadorNome: "Marcos Antônio Rocha",
     },
     {
         name: "Rafael Mendes Costa",
@@ -38,6 +39,7 @@ const alunosSeed = [
             is_admin: false,
         },
         academiaIndex: 1,
+        treinadorNome: "Marcos Antônio Rocha",
     },
     {
         name: "Juliana Ferreira Lima",
@@ -50,6 +52,7 @@ const alunosSeed = [
             is_admin: false,
         },
         academiaIndex: 2,
+        treinadorNome: "Fernanda Souza Almeida",
     },
     {
         name: "José Lucas Brandão Montes",
@@ -78,8 +81,14 @@ const alunosSeed = [
     },
 ];
 
-export async function seedUsuarios(academiasIds: string[]): Promise<string[]> {
+type TreinadorSeedRef = {
+    id: string;
+    nome: string;
+};
+
+export async function seedUsuarios(academiasIds: string[], treinadores: TreinadorSeedRef[]): Promise<string[]> {
     if (academiasIds.length === 0) throw new Error("Nenhuma academia encontrada para vincular usuários.");
+    if (treinadores.length === 0) throw new Error("Nenhum treinador encontrado para vincular alunos.");
 
     // Criar alunos via BetterAuth 
     const alunosValues = [];
@@ -87,9 +96,18 @@ export async function seedUsuarios(academiasIds: string[]): Promise<string[]> {
         const authUser = await auth.api.signUpEmail({
             body: { name: seed.name, email: seed.email, password: seed.password },
         });
+        const treinadorId = seed.treinadorNome
+            ? treinadores.find((treinador) => treinador.nome === seed.treinadorNome)?.id
+            : null;
+
+        if (seed.treinadorNome && !treinadorId) {
+            throw new Error(`Treinador não encontrado para o aluno ${seed.name}: ${seed.treinadorNome}`);
+        }
+
         alunosValues.push({
             user_id: authUser.user.id,
             academia_id: academiasIds[seed.academiaIndex],
+            treinador_id: treinadorId,
             ...seed.perfil,
         });
     }

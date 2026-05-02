@@ -35,6 +35,7 @@ export interface SessaoExercicioDetalhe {
         id: string;
         nome: string;
         descricao: string | null;
+        animacao_url: string | null;
     };
     template: {
         series: number;
@@ -141,6 +142,7 @@ class SessaoRepository {
                     exercicio_id: exercicio.id,
                     exercicio_nome: exercicio.nome,
                     exercicio_descricao: exercicio.descricao,
+                    exercicio_animacao_url: exercicio.animacao_url,
                 })
                 .from(sessao_exercicio)
                 .innerJoin(treino_exercicio, eq(sessao_exercicio.treino_exercicio_id, treino_exercicio.id))
@@ -185,6 +187,7 @@ class SessaoRepository {
                     id: r.exercicio_id,
                     nome: r.exercicio_nome,
                     descricao: r.exercicio_descricao,
+                    animacao_url: r.exercicio_animacao_url,
                 },
                 template: {
                     series: r.te_series,
