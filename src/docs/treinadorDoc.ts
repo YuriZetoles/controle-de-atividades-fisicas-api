@@ -6,6 +6,7 @@ import {
   treinadorQuerySchema,
   treinadorUpdateSchema,
 } from "../utils/validations/treinadorValidation";
+import { alunoQuerySchema } from "../utils/validations/alunoValidation";
 
 export const treinadorRegistry = new OpenAPIRegistry();
 
@@ -34,6 +35,22 @@ const TreinadorResponse = z
       .openapi({ example: "550e8400-e29b-41d4-a716-446655440001" }),
   })
   .openapi("Treinador");
+
+const AlunoResponse = z.object({
+  id: z.string().uuid().openapi({ example: "550e8400-e29b-41d4-a716-446655440000" }),
+  user_id: z.string().openapi({ example: "user_abc123" }),
+  nome: z.string().openapi({ example: "João Silva" }),
+  data_nascimento: z.string().openapi({ example: "2000-01-15" }),
+  sexo: z.string().openapi({ example: "M" }),
+  url_foto: z.string().nullable().openapi({ example: "https://example.com/foto.jpg" }),
+  status_conta: z.boolean().openapi({ example: true }),
+  academia_id: z.string().uuid().openapi({ example: "550e8400-e29b-41d4-a716-446655440000" }),
+  treinador_id: z
+    .string()
+    .uuid()
+    .nullable()
+    .openapi({ example: "550e8400-e29b-41d4-a716-446655440002" }),
+}).openapi("Aluno");
 
 // GET /treinadores
 treinadorRegistry.registerPath({
@@ -66,6 +83,42 @@ treinadorRegistry.registerPath({
       },
     },
     401: { description: "Não autorizado" },
+    422: { description: "Erro de validação nos query params" },
+  },
+});
+
+// GET /treinadores/me/alunos
+treinadorRegistry.registerPath({
+  method: "get",
+  path: "/treinadores/me/alunos",
+  summary: "Listar alunos vinculados ao treinador autenticado",
+  description: "Retorna alunos vinculados ao treinador logado, com paginação.",
+  tags: ["Treinador"],
+  security: [{ BearerAuth: [] }],
+  request: { query: alunoQuerySchema },
+  responses: {
+    200: {
+      description: "Lista paginada de alunos vinculados",
+      content: {
+        "application/json": {
+          schema: z.object({
+            error: z.boolean().openapi({ example: false }),
+            code: z.number().openapi({ example: 200 }),
+            message: z.string().nullable(),
+            data: z.object({
+              dados: z.array(AlunoResponse),
+              total: z.number().openapi({ example: 10 }),
+              page: z.number().openapi({ example: 1 }),
+              limite: z.number().openapi({ example: 10 }),
+              totalPages: z.number().openapi({ example: 1 }),
+            }),
+            errors: z.array(z.any()),
+          }),
+        },
+      },
+    },
+    401: { description: "Não autorizado" },
+    403: { description: "Acesso negado" },
     422: { description: "Erro de validação nos query params" },
   },
 });
