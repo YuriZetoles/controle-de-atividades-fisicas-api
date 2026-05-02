@@ -1,19 +1,64 @@
 stages:
   - quality
-  - smoke
   - test
   - build
   - deploy
 
+# ── variáveis de ambiente compartilhadas (CI) ─────────────────────────────────
+.ci_env: &ci_env
+  POSTGRES_DB: aplicativo_atividades_fisicas
+  POSTGRES_USER: postgres
+  POSTGRES_PASSWORD: postgres
+  DATABASE_URL: 'postgresql://postgres:postgres@postgres/aplicativo_atividades_fisicas'
+  NODE_ENV: 'ci'
+  PORT: '1350'
+  BETTER_AUTH_SECRET: 'ci-secret-key-pipeline-only-not-production-32chars'
+  BETTER_AUTH_URL: 'http://localhost:1350'
+  API_BASE_URL: 'http://localhost:1350/api'
+  MINIO_ENDPOINT: 'localhost'
+  MINIO_PORT: '9000'
+  MINIO_USE_SSL: 'false'
+  MINIO_ACCESS_KEY: 'ci-access-key'
+  MINIO_SECRET_KEY: 'ci-secret-key'
+  MINIO_BUCKET_FOTOS: 'ci-bucket'
+  MINIO_LOCAL: 'true'
+  MINIO_PUBLIC_URL: ''
+  AWS_ACCESS_KEY_ID: 'ci-access-key'
+  AWS_SECRET_ACCESS_KEY: 'ci-secret-key'
+  AWS_REGION: 'us-east-1'
+  AWS_BUCKET_NAME: 'ci-bucket'
+  AWS_ENDPOINT_URL: 'http://localhost:9000'
+  AWS_PUBLIC_URL: ''
+  UPLOAD_MAX_FILE_SIZE_MB: '20'
+  EXERCISEDB_API_KEY: 'ci-key'
+  EXERCISEDB_API_HOST: 'exercisedb.p.rapidapi.com'
+  EXERCISEDB_BASE_URL: 'https://exercisedb.p.rapidapi.com'
+
+# ── serviço postgres compartilhado ────────────────────────────────────────────
+.postgres_service: &postgres_service
+  - name: postgres:17-alpine
+    alias: postgres
+
+# ── cache npm com fallback ────────────────────────────────────────────────────
+.npm_cache: &npm_cache
+  cache:
+    - key:
+        files:
+          - package-lock.json
+      paths:
+        - node_modules/
+      policy: pull-push
+    - key: 'npm-fallback'
+      paths:
+        - node_modules/
+      policy: pull
+
 default:
   image: node:22-alpine
-  cache:
-    key: 'npm-$CI_COMMIT_REF_SLUG'
-    paths:
-      - node_modules/
+  <<: *npm_cache
 
-# ── quality ──────────────────────────────────────────────────────────────────
-# Shared runners — TypeScript build check
+# ── quality ───────────────────────────────────────────────────────────────────
+# TypeScript check — roda apenas em MR
 # ─────────────────────────────────────────────────────────────────────────────
 
 quality:
@@ -24,46 +69,16 @@ quality:
     - npx tsc --noEmit
   rules:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
-    - if: '$CI_COMMIT_BRANCH == "develop"'
-    - if: '$CI_COMMIT_BRANCH == "main"'
 
 # ── smoke ─────────────────────────────────────────────────────────────────────
-# Shared runners — sobe servidor com banco real e valida /api
+# Sobe servidor com banco real e valida /api — roda em paralelo com quality
 # ─────────────────────────────────────────────────────────────────────────────
 
 smoke:
-  stage: smoke
-  services:
-    - name: postgres:17-alpine
-      alias: postgres
+  stage: quality
+  services: *postgres_service
   variables:
-    POSTGRES_DB: aplicativo_atividades_fisicas
-    POSTGRES_USER: postgres
-    POSTGRES_PASSWORD: postgres
-    DATABASE_URL: 'postgresql://postgres:postgres@postgres/aplicativo_atividades_fisicas'
-    NODE_ENV: 'ci'
-    PORT: '1350'
-    BETTER_AUTH_SECRET: 'ci-secret-key-pipeline-only-not-production-32chars'
-    BETTER_AUTH_URL: 'http://localhost:1350'
-    API_BASE_URL: 'http://localhost:1350/api'
-    MINIO_ENDPOINT: 'localhost'
-    MINIO_PORT: '9000'
-    MINIO_USE_SSL: 'false'
-    MINIO_ACCESS_KEY: 'ci-access-key'
-    MINIO_SECRET_KEY: 'ci-secret-key'
-    MINIO_BUCKET_FOTOS: 'ci-bucket'
-    MINIO_LOCAL: 'true'
-    MINIO_PUBLIC_URL: ''
-    AWS_ACCESS_KEY_ID: 'ci-access-key'
-    AWS_SECRET_ACCESS_KEY: 'ci-secret-key'
-    AWS_REGION: 'us-east-1'
-    AWS_BUCKET_NAME: 'ci-bucket'
-    AWS_ENDPOINT_URL: 'http://localhost:9000'
-    AWS_PUBLIC_URL: ''
-    UPLOAD_MAX_FILE_SIZE_MB: '20'
-    EXERCISEDB_API_KEY: 'ci-key'
-    EXERCISEDB_API_HOST: 'exercisedb.p.rapidapi.com'
-    EXERCISEDB_BASE_URL: 'https://exercisedb.p.rapidapi.com'
+    <<: *ci_env
   before_script:
     - apk add --no-cache curl
     - npm ci
@@ -76,65 +91,32 @@ smoke:
         sleep 2
       done
     - curl -sf http://localhost:1350/api
-  needs: [quality]
   rules:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
-    - if: '$CI_COMMIT_BRANCH == "develop"'
-    - if: '$CI_COMMIT_BRANCH == "main"'
 
 # ── test ──────────────────────────────────────────────────────────────────────
-# Shared runners — testes de integração com banco real (supertest + Jest)
-# jest.setup.js substitui DATABASE_URL por DATABASE_URL_TEST automaticamente
+# Testes de integração com banco real — roda apenas em MR, após quality+smoke
 # ─────────────────────────────────────────────────────────────────────────────
 
 test:
   stage: test
-  services:
-    - name: postgres:17-alpine
-      alias: postgres
+  services: *postgres_service
   variables:
-    POSTGRES_DB: aplicativo_atividades_fisicas
-    POSTGRES_USER: postgres
-    POSTGRES_PASSWORD: postgres
-    DATABASE_URL: 'postgresql://postgres:postgres@postgres/aplicativo_atividades_fisicas'
-    DATABASE_URL_TEST: 'postgresql://postgres:postgres@postgres/aplicativo_atividades_fisicas_test'
+    <<: *ci_env
     NODE_ENV: 'test'
-    PORT: '1350'
-    BETTER_AUTH_SECRET: 'ci-secret-key-pipeline-only-not-production-32chars'
-    BETTER_AUTH_URL: 'http://localhost:1350'
-    API_BASE_URL: 'http://localhost:1350/api'
-    MINIO_ENDPOINT: 'localhost'
-    MINIO_PORT: '9000'
-    MINIO_USE_SSL: 'false'
-    MINIO_ACCESS_KEY: 'ci-access-key'
-    MINIO_SECRET_KEY: 'ci-secret-key'
-    MINIO_BUCKET_FOTOS: 'ci-bucket'
-    MINIO_LOCAL: 'true'
-    MINIO_PUBLIC_URL: ''
-    AWS_ACCESS_KEY_ID: 'ci-access-key'
-    AWS_SECRET_ACCESS_KEY: 'ci-secret-key'
-    AWS_REGION: 'us-east-1'
-    AWS_BUCKET_NAME: 'ci-bucket'
-    AWS_ENDPOINT_URL: 'http://localhost:9000'
-    AWS_PUBLIC_URL: ''
-    UPLOAD_MAX_FILE_SIZE_MB: '20'
-    EXERCISEDB_API_KEY: 'ci-key'
-    EXERCISEDB_API_HOST: 'exercisedb.p.rapidapi.com'
-    EXERCISEDB_BASE_URL: 'https://exercisedb.p.rapidapi.com'
+    DATABASE_URL_TEST: 'postgresql://postgres:postgres@postgres/aplicativo_atividades_fisicas_test'
   before_script:
     - npm ci
   script:
     - npm run test:setup
     - npm test -- --runInBand --forceExit
-  needs: [smoke]
+  needs: [quality, smoke]
   rules:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
-    - if: '$CI_COMMIT_BRANCH == "develop"'
-    - if: '$CI_COMMIT_BRANCH == "main"'
 
 # ── build ─────────────────────────────────────────────────────────────────────
-# Runner k3s (kubernetes executor, namespace: tools)
-# Docker-in-Docker (dind) para build multi-plataforma amd64 + arm64
+# Runner k3s — Docker buildx multi-plataforma com cache de camadas via registry
+# Roda apenas em develop/main (testes já validados no MR)
 # Requer variáveis CI/CD: DOCKERHUB_USER, DOCKERHUB_TOKEN
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -164,19 +146,20 @@ build:
       fi
       docker buildx build \
         --platform linux/amd64,linux/arm64 \
+        --cache-from type=registry,ref=yurizetoles/atividades_fisicas_api:buildcache \
+        --cache-to type=registry,ref=yurizetoles/atividades_fisicas_api:buildcache,mode=max \
         -t yurizetoles/atividades_fisicas_api:$TAG_SUFFIX \
         -t yurizetoles/atividades_fisicas_api:$CI_COMMIT_SHORT_SHA \
         --push .
   after_script:
     - docker logout
+  needs: []
   rules:
     - if: '$CI_COMMIT_BRANCH == "develop"'
     - if: '$CI_COMMIT_BRANCH == "main"'
 
 # ── deploy ────────────────────────────────────────────────────────────────────
-# Runner k3s (kubernetes executor, namespace: tools)
-# kubectl via in-cluster config — ServiceAccount gitlab-runner tem Role
-# em fabricaiv (ver deploy/runner/gitlab-runner-rbac.yaml)
+# Runner k3s — kubectl via in-cluster config
 # ─────────────────────────────────────────────────────────────────────────────
 
 deploy-qa:
