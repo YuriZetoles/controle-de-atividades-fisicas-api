@@ -115,8 +115,19 @@ test:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
 
 # ── build ─────────────────────────────────────────────────────────────────────
-# Runner k3s — Docker buildx multi-plataforma com cache de camadas via registry
-# Roda apenas em develop/main (testes já validados no MR)
+# Runner k3s (ARM64 nativo) — build somente linux/arm64.
+# O cluster k3s de deploy é ARM64, portanto amd64 não é necessário.
+#
+# NECESSIDADE FUTURA — suporte a amd64 (ex: devs com máquinas Intel/AMD):
+#   A abordagem correta é builds nativos paralelos (sem emulação QEMU):
+#   1. Adicionar stage "manifest" após "build" no topo do arquivo.
+#   2. Dividir este job em dois:
+#      - build-arm64: tags [k3s-vm-fabrica], --platform linux/arm64, push tag :SHA-arm64
+#      - build-amd64: sem tags (shared runner AMD64), --platform linux/amd64, push tag :SHA-amd64
+#   3. Adicionar job merge-manifest com needs [build-arm64, build-amd64]:
+#      docker buildx imagetools create -t imagem:TAG :SHA-arm64 :SHA-amd64
+#   Resultado: dois builds nativos em paralelo, sem QEMU, ~2-4 min total.
+#
 # Requer variáveis CI/CD: DOCKERHUB_USER, DOCKERHUB_TOKEN
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -133,8 +144,7 @@ build:
     DOCKER_DRIVER: overlay2
     DOCKER_TLS_CERTDIR: ''
   before_script:
-    - docker run --privileged --rm tonistiigi/binfmt --install all
-    - docker buildx create --name multiarch --driver docker-container --use 2>/dev/null || docker buildx use multiarch
+    - docker buildx create --name builder --driver docker-container --use 2>/dev/null || docker buildx use builder
     - docker buildx inspect --bootstrap
     - echo "$DOCKERHUB_TOKEN" | docker login -u "$DOCKERHUB_USER" --password-stdin
   script:
@@ -145,7 +155,7 @@ build:
         TAG_SUFFIX="$CI_COMMIT_BRANCH"
       fi
       docker buildx build \
-        --platform linux/amd64,linux/arm64 \
+        --platform linux/arm64 \
         --cache-from type=registry,ref=yurizetoles/atividades_fisicas_api:buildcache \
         --cache-to type=registry,ref=yurizetoles/atividades_fisicas_api:buildcache,mode=max \
         -t yurizetoles/atividades_fisicas_api:$TAG_SUFFIX \
