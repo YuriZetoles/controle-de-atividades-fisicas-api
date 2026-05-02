@@ -84,6 +84,29 @@ class TreinadorController {
 		}
 	};
 
+	getAlunosVinculados = async (req: Request, res: Response) => {
+		console.log("[TreinadorController] [getAlunosVinculados] Requisição recebida");
+		const userId = (req as any).user?.id as string | undefined;
+
+		if (!userId) {
+			return CommonResponse.error(
+				res,
+				HttpStatusCode.UNAUTHORIZED.code,
+				null,
+				null,
+				[],
+				"Usuário não autenticado",
+			);
+		}
+
+		try {
+			const resultado = await this.service.getAlunosVinculados(userId, req.query);
+			return CommonResponse.success(res, resultado, HttpStatusCode.OK.code);
+		} catch (error) {
+			return this.handleError(res, error, "getAlunosVinculados");
+		}
+	};
+
 	createTreinador = async (req: Request, res: Response) => {
 	        let fotoUrl: string | null = null;
 	        try {
@@ -220,6 +243,17 @@ class TreinadorController {
 
 		if (errorMessage.toLowerCase().includes("corpo da requisição é obrigatório")) {
 			return CommonResponse.error(res, HttpStatusCode.BAD_REQUEST.code, null, null, [], errorMessage);
+		}
+
+		if (errorMessage.startsWith("FORBIDDEN:")) {
+			return CommonResponse.error(
+				res,
+				HttpStatusCode.FORBIDDEN.code,
+				null,
+				null,
+				[],
+				errorMessage.replace("FORBIDDEN: ", ""),
+			);
 		}
 
 		if (errorMessage.includes("não encontrado")) {

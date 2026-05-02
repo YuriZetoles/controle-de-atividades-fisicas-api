@@ -53,7 +53,12 @@ const treinadoresSeed = [
 	},
 ];
 
-export async function seedTreinadores(academiasIds: string[]): Promise<void> {
+type TreinadorSeedResult = {
+	id: string;
+	nome: string;
+};
+
+export async function seedTreinadores(academiasIds: string[]): Promise<TreinadorSeedResult[]> {
 	if (academiasIds.length === 0) {
 		throw new Error("Nenhuma academia encontrada para vincular treinadores.");
 	}
@@ -71,5 +76,10 @@ export async function seedTreinadores(academiasIds: string[]): Promise<void> {
 		});
 	}
 
-	await DataBase.insert(treinador).values(treinadoresValues);
+	const treinadoresCriados = await DataBase
+		.insert(treinador)
+		.values(treinadoresValues)
+		.returning({ id: treinador.id, nome: treinador.nome });
+
+	return treinadoresCriados;
 }

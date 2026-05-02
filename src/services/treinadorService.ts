@@ -1,4 +1,6 @@
 import TreinadorRepository from "../repositories/treinadorRepository";
+import AlunoRepository from "../repositories/alunoRepository";
+import UsuarioRepository from "../repositories/usuarioRepository";
 import { type_treinador } from "../types/dbSchemas";
 import {
 	treinadorIdSchema,
@@ -6,15 +8,20 @@ import {
 	treinadorQuerySchema,
 	treinadorUpdateSchema,
 } from "../utils/validations/treinadorValidation";
+import { alunoQuerySchema } from "../utils/validations/alunoValidation";
 import { ZodError } from "zod";
 import { DatabaseError } from "../utils/errors/DatabaseError";
 import HttpStatusCode from "../utils/helpers/httpStatusCode";
 
 class TreinadorService {
 	private repository: TreinadorRepository;
+	private alunoRepository: AlunoRepository;
+	private usuarioRepository: UsuarioRepository;
 
 	constructor() {
 		this.repository = new TreinadorRepository();
+		this.alunoRepository = new AlunoRepository();
+		this.usuarioRepository = new UsuarioRepository();
 	}
 
 	async getAllTreinadores(query: any) {
@@ -105,6 +112,25 @@ class TreinadorService {
 		);
 
 		return treinadorAtualizado;
+	}
+
+	async getAlunosVinculados(userId: string, query: any) {
+		const { page, limite } = alunoQuerySchema.parse(query);
+		const perfil = await this.usuarioRepository.buscarPerfilAcesso(userId);
+
+		if (!perfil.isTreinador && !perfil.isAdmin) {
+			throw new Error("FORBIDDEN: usuário sem perfil de treinador");
+		}
+
+		if (!perfil.treinadorId) {
+			throw new Error("Treinador não encontrado");
+		}
+
+		return this.alunoRepository.getAlunosByTreinadorId(
+			perfil.treinadorId,
+			page,
+			limite,
+		);
 	}
 }
 

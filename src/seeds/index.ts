@@ -33,9 +33,11 @@ async function runSeeds() {
         console.log(chalk.cyanBright(`※ ${chalk.cyan('Exercícios, Músculos e Aparelhos...')}`));
         await seedExercicios();
 
-        console.log(chalk.cyanBright(`※ ${chalk.cyan('Alunos e Treinadores...')}`));
-        const alunoIds = await seedUsuarios(academiasIds);
-        await seedTreinadores(academiasIds);
+        console.log(chalk.cyanBright(`※ ${chalk.cyan('Treinadores...')}`));
+        const treinadores = await seedTreinadores(academiasIds);
+
+        console.log(chalk.cyanBright(`※ ${chalk.cyan('Alunos...')}`));
+        const alunoIds = await seedUsuarios(academiasIds, treinadores);
 
         console.log(chalk.cyanBright(`※ ${chalk.cyan('Exercícios Pessoais...')}`));
         await seedExerciciosPessoais(alunoIds);

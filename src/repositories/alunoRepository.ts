@@ -48,6 +48,32 @@ class AlunoRepository {
     }
   }
 
+  async getAlunosByTreinadorId(
+    treinadorId: string,
+    page: number,
+    limite: number
+  ): Promise<{ dados: type_aluno[]; total: number; page: number; limite: number; totalPages: number }> {
+    try {
+      const offset = (page - 1) * limite;
+      const [dados, countResult] = await Promise.all([
+        this.db
+          .select()
+          .from(aluno)
+          .where(eq(aluno.treinador_id, treinadorId))
+          .limit(limite)
+          .offset(offset),
+        this.db
+          .select({ count: sql<number>`count(*)` })
+          .from(aluno)
+          .where(eq(aluno.treinador_id, treinadorId)),
+      ]);
+      const total = Number(countResult[0].count);
+      return { dados: dados as unknown as type_aluno[], total, page, limite, totalPages: Math.ceil(total / limite) };
+    } catch (error) {
+      throw parseDatabaseError(error, "AlunoRepository.getAlunosByTreinadorId");
+    }
+  }
+
   async findById(id: string): Promise<type_aluno | null> {
     try {
       const resultado = await this.db

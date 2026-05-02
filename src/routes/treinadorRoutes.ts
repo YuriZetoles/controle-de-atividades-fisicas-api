@@ -21,6 +21,7 @@ const upload = multer({
 const treinadorController = new TreinadorController();
 
 router
+		.get("/treinadores/me/alunos", authMiddleware, treinadorController.getAlunosVinculados)
         .get("/treinadores", authMiddleware, treinadorController.getAllTreinadores)
         .get("/treinadores/:id", authMiddleware, treinadorController.getTreinadorById)
         .post("/treinadores", authMiddleware, upload.single('foto'), treinadorController.createTreinador)
