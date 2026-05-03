@@ -364,13 +364,13 @@ class SessaoRepository {
                 .where(eq(sessao_exercicio.sessao_treino_id, id));
 
             const exercicios_total = exerciciosRows.length;
-            const exercicios_concluidos = exerciciosRows.filter((e) => e.concluido).length;
 
             const exercicioIds = exerciciosRows.map((e) => e.id);
 
             const seriesRows = exercicioIds.length > 0
                 ? await this.db
                     .select({
+                        sessao_exercicio_id: sessao_serie.sessao_exercicio_id,
                         status: sessao_serie.status,
                         repeticoes_realizadas: sessao_serie.repeticoes_realizadas,
                         carga_utilizada: sessao_serie.carga_utilizada,
@@ -378,6 +378,13 @@ class SessaoRepository {
                     .from(sessao_serie)
                     .where(inArray(sessao_serie.sessao_exercicio_id, exercicioIds))
                 : [];
+
+            const exerciciosComSerieConcluida = new Set(
+                seriesRows.filter((s) => s.status === 'CONCLUIDA').map((s) => s.sessao_exercicio_id),
+            );
+            const exercicios_concluidos = exerciciosRows.filter(
+                (e) => e.concluido && exerciciosComSerieConcluida.has(e.id),
+            ).length;
 
             const series_total = seriesRows.length;
             const series_concluidas = seriesRows.filter((s) => s.status === 'CONCLUIDA').length;
