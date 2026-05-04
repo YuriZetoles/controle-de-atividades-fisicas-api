@@ -26,18 +26,18 @@ class HistoricoService {
     private async _resolverAlunoId(userId: string, alunoIdParam?: string): Promise<string> {
         const perfil = await this.usuarioRepository.buscarPerfilAcesso(userId);
 
-        if (perfil.isAdmin) {
-            if (!alunoIdParam) {
-                throw new Error('UNPROCESSABLE: admin deve informar aluno_id');
-            }
-            return alunoIdParam;
-        }
-
         if (perfil.isAluno && perfil.alunoId) {
             if (alunoIdParam && alunoIdParam !== perfil.alunoId) {
                 throw new Error('FORBIDDEN: você só pode visualizar seu próprio histórico');
             }
             return perfil.alunoId;
+        }
+
+        if (perfil.isAdmin) {
+            if (!alunoIdParam) {
+                throw new Error('UNPROCESSABLE: admin deve informar aluno_id');
+            }
+            return alunoIdParam;
         }
 
         if (perfil.isTreinador && perfil.treinadorId) {
