@@ -26,6 +26,11 @@ export const auth = betterAuth({
     updateAge: 60 * 60 * 24,     // Atualiza a sessão a cada 1 dia
   },
 
-  // Aceita requisições de qualquer origem (necessário para app mobile)
-  trustedOrigins: ["*","http://localhost:3000"],
+  trustedOrigins: [
+    "*",
+    "http://localhost:1350",
+    "http://localhost:3000",
+    "https://atividadesfisicas-api-qa.yuriprojects.dpdns.org",
+    "https://atividadesfisicas-api.yuriprojects.dpdns.org",
+  ],
 });
