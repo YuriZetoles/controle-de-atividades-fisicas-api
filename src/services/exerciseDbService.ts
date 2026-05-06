@@ -276,9 +276,10 @@ class ExerciseDbService {
                     '-c:v', 'libvpx-vp9',
                     '-b:v', '0',
                     '-crf', '34',
-                    '-pix_fmt', 'yuva420p',
+                    '-pix_fmt', 'yuv420p',
+                    '-deadline', 'good',
+                    '-cpu-used', '2',
                     '-an',
-                    '-loop', '0',
                     outFile,
                 ], { stdio: 'ignore' });
                 proc.on('error', reject);
