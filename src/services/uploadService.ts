@@ -1,5 +1,7 @@
 import crypto from "crypto";
 import path from "path";
+import { Readable, PassThrough } from "stream";
+import ffmpeg from "fluent-ffmpeg";
 import { minioClient, minioConfig, getPublicObjectUrl, prepareMinioUpload } from "../config/garageHqConnect";
 
 type UploadedFile = {
@@ -47,6 +49,26 @@ class UploadService {
     return { bucket, objectKey };
   }
 
+  private async reencodeWebm(inputBuffer: Buffer): Promise<Buffer> {
+    return new Promise<Buffer>((resolve, reject) => {
+      const input = Readable.from(inputBuffer);
+      const output = new PassThrough();
+      const chunks: Buffer[] = [];
+
+      output.on("data", (chunk: Buffer) => chunks.push(chunk));
+      output.on("end", () => resolve(Buffer.concat(chunks)));
+      output.on("error", reject);
+
+      ffmpeg(input)
+        .inputFormat("webm")
+        .videoCodec("libvpx-vp9")
+        .outputOptions(["-b:v", "0", "-crf", "33", "-row-mt", "1", "-an"])
+        .format("webm")
+        .on("error", reject)
+        .pipe(output, { end: true });
+    });
+  }
+
   private async uploadSingleFile(category: string, file: UploadedFile): Promise<UploadedObjectResult> {
     const bucket = minioConfig.bucket;
     if (!bucket) {
@@ -55,11 +77,25 @@ class UploadService {
 
     const objectKey = this.buildObjectKey(category, file.originalname);
 
+    let uploadBuffer = file.buffer;
+    let uploadSize = file.size;
+
+    const isWebm = file.mimetype === "video/webm" || file.originalname.toLowerCase().endsWith(".webm");
+    if (isWebm) {
+      try {
+        uploadBuffer = await this.reencodeWebm(file.buffer);
+        uploadSize = uploadBuffer.length;
+        console.log(`[UploadService] WebM re-encoded: ${file.size} → ${uploadSize} bytes`);
+      } catch (err) {
+        console.error("[UploadService] WebM re-encode falhou, usando original:", err);
+      }
+    }
+
     await minioClient.putObject(
       bucket,
       objectKey,
-      file.buffer,
-      file.size,
+      uploadBuffer,
+      uploadSize,
       { "Content-Type": file.mimetype },
     );
 
