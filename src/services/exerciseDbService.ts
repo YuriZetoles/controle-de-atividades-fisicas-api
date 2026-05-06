@@ -628,6 +628,42 @@ class ExerciseDbService {
         };
     }
 
+    // Re-sincroniza a mídia de um exercício específico pelo nome em inglês (ExerciseDB).
+    // Força o download mesmo que animacao_url já exista — útil para re-processar após
+    // correção no pipeline de encoding.
+    async syncMidiaExercicio(nomeEn: string): Promise<{ animacao_url: string; nome_pt: string; exercicio_id: string }> {
+        const nomePt = translateExerciseName(nomeEn);
+
+        const [existente] = await DataBase
+            .select({ id: exercicio.id })
+            .from(exercicio)
+            .where(and(eq(exercicio.nome, nomePt), isNull(exercicio.aluno_id)));
+
+        if (!existente) {
+            throw new Error(`Exercício "${nomePt}" não encontrado no banco local. Execute o sync completo primeiro.`);
+        }
+
+        const resultados = await this.searchByName(nomeEn, 1, 0);
+        if (!resultados.length) {
+            throw new Error(`UPSTREAM: Exercício "${nomeEn}" não encontrado na ExerciseDB.`);
+        }
+
+        const item = resultados[0];
+        const gifBuffer = await this.fetchImageBuffer(item.id, '360');
+        if (!gifBuffer) {
+            throw new Error(`UPSTREAM: Imagem não disponível na ExerciseDB para "${nomeEn}".`);
+        }
+
+        const animacaoUrl = await this.cacheGifBufferToS3(gifBuffer, `${item.id}-${item.name}`);
+
+        await DataBase
+            .update(exercicio)
+            .set({ animacao_url: animacaoUrl })
+            .where(eq(exercicio.id, existente.id));
+
+        return { animacao_url: animacaoUrl, nome_pt: nomePt, exercicio_id: existente.id };
+    }
+
     private capitalizar(s: string): string {
         return s
             .split(/\s+/)

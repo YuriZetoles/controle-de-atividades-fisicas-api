@@ -208,6 +208,28 @@ class ExerciseDbController {
             return this.handleError(res, error, 'syncCompleto');
         }
     }
+
+    syncMidiaExercicio = async (req: Request, res: Response) => {
+        try {
+            const nomeEn = String(req.query.nome_en || '').trim();
+            if (!nomeEn) {
+                return CommonResponse.error(
+                    res, HttpStatusCode.BAD_REQUEST.code, null, 'nome_en', [],
+                    'Parâmetro "nome_en" obrigatório (nome inglês da ExerciseDB, ex: "3/4 sit-up").',
+                );
+            }
+            this.service.resetRequests();
+            const resultado = await this.service.syncMidiaExercicio(nomeEn);
+            return CommonResponse.success(
+                res,
+                { ...resultado, requests_api_utilizadas: this.service.getRequestsRealizadas() },
+                HttpStatusCode.OK.code,
+                `Mídia de "${resultado.nome_pt}" re-sincronizada com sucesso.`,
+            );
+        } catch (error) {
+            return this.handleError(res, error, 'syncMidiaExercicio');
+        }
+    }
 }
 
 export default ExerciseDbController;

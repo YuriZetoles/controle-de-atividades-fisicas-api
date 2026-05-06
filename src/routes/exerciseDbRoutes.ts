@@ -20,5 +20,7 @@ router.post('/exercisedb/sync/musculos', authMiddleware, adminMiddleware, contro
 router.post('/exercisedb/sync/aparelhos', authMiddleware, adminMiddleware, controller.syncAparelhos);
 router.post('/exercisedb/sync/exercicios', authMiddleware, adminMiddleware, controller.syncExercicios);
 router.post('/exercisedb/sync/completo', authMiddleware, adminMiddleware, controller.syncCompleto);
+// Re-processa mídia de exercício específico — força re-download + re-encode mesmo se já existe animacao_url
+router.post('/exercisedb/sync/exercicio-midia', authMiddleware, adminMiddleware, controller.syncMidiaExercicio);
 
 export default router;
