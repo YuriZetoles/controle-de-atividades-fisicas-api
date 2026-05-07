@@ -10,6 +10,7 @@ import {
     aluno,
 } from '../config/db/schema';
 import { type_sessao_treino, type_sessao_exercicio, type_sessao_serie } from '../types/dbSchemas';
+import { enum_tipo_exercicio } from '../types/enum';
 import { parseDatabaseError } from '../utils/errors/DatabaseError';
 import SessaoFilterBuilder from './filters/SessaoFilterBuilder';
 import { SessaoListQuery } from '../utils/validations/sessaoValidation';
@@ -19,8 +20,16 @@ export interface SessaoSerieDetalhe {
     numero_serie: number;
     repeticoes_realizadas: number | null;
     carga_utilizada: string | null;
+    tempo_realizado_segundos: number | null;
+    distancia_realizada_metros: number | null;
+    pace_segundos_por_km: number | null;
     status: 'PENDENTE' | 'CONCLUIDA' | 'PULADA';
     observacoes: string | null;
+}
+
+function calcularPace(tempoSegundos: number | null, distanciaMetros: number | null): number | null {
+    if (!tempoSegundos || !distanciaMetros || distanciaMetros <= 0) return null;
+    return Math.round((tempoSegundos / distanciaMetros) * 1000);
 }
 
 export interface SessaoExercicioDetalhe {
@@ -36,11 +45,14 @@ export interface SessaoExercicioDetalhe {
         nome: string;
         descricao: string | null;
         animacao_url: string | null;
+        tipo_exercicio: enum_tipo_exercicio;
     };
     template: {
         series: number;
-        repeticoes: string;
+        repeticoes: string | null;
         carga_sugerida: string | null;
+        duracao_sugerida_segundos: number | null;
+        distancia_sugerida_metros: number | null;
         tempo_descanso_segundos: number;
         ordem_execucao: number;
     };
@@ -137,12 +149,15 @@ class SessaoRepository {
                     te_series: treino_exercicio.series,
                     te_repeticoes: treino_exercicio.repeticoes,
                     te_carga_sugerida: treino_exercicio.carga_sugerida,
+                    te_duracao_sugerida_segundos: treino_exercicio.duracao_sugerida_segundos,
+                    te_distancia_sugerida_metros: treino_exercicio.distancia_sugerida_metros,
                     te_tempo_descanso_segundos: treino_exercicio.tempo_descanso_segundos,
                     te_ordem_execucao: treino_exercicio.ordem_execucao,
                     exercicio_id: exercicio.id,
                     exercicio_nome: exercicio.nome,
                     exercicio_descricao: exercicio.descricao,
                     exercicio_animacao_url: exercicio.animacao_url,
+                    exercicio_tipo: exercicio.tipo_exercicio,
                 })
                 .from(sessao_exercicio)
                 .innerJoin(treino_exercicio, eq(sessao_exercicio.treino_exercicio_id, treino_exercicio.id))
@@ -169,6 +184,9 @@ class SessaoRepository {
                     numero_serie: sr.numero_serie,
                     repeticoes_realizadas: sr.repeticoes_realizadas,
                     carga_utilizada: sr.carga_utilizada,
+                    tempo_realizado_segundos: sr.tempo_realizado_segundos,
+                    distancia_realizada_metros: sr.distancia_realizada_metros,
+                    pace_segundos_por_km: calcularPace(sr.tempo_realizado_segundos, sr.distancia_realizada_metros),
                     status: sr.status as 'PENDENTE' | 'CONCLUIDA' | 'PULADA',
                     observacoes: sr.observacoes,
                 });
@@ -188,11 +206,14 @@ class SessaoRepository {
                     nome: r.exercicio_nome,
                     descricao: r.exercicio_descricao,
                     animacao_url: r.exercicio_animacao_url,
+                    tipo_exercicio: r.exercicio_tipo,
                 },
                 template: {
                     series: r.te_series,
                     repeticoes: r.te_repeticoes,
                     carga_sugerida: r.te_carga_sugerida,
+                    duracao_sugerida_segundos: r.te_duracao_sugerida_segundos,
+                    distancia_sugerida_metros: r.te_distancia_sugerida_metros,
                     tempo_descanso_segundos: r.te_tempo_descanso_segundos,
                     ordem_execucao: r.te_ordem_execucao,
                 },
@@ -333,6 +354,9 @@ class SessaoRepository {
         series_concluidas: number;
         series_total: number;
         volume_total_kg: number;
+        tempo_total_isometria_segundos: number;
+        distancia_total_metros: number;
+        pace_medio_segundos_por_km: number | null;
         taxa_conclusao: number;
     } | null> {
         try {
@@ -374,8 +398,14 @@ class SessaoRepository {
                         status: sessao_serie.status,
                         repeticoes_realizadas: sessao_serie.repeticoes_realizadas,
                         carga_utilizada: sessao_serie.carga_utilizada,
+                        tempo_realizado_segundos: sessao_serie.tempo_realizado_segundos,
+                        distancia_realizada_metros: sessao_serie.distancia_realizada_metros,
+                        tipo_exercicio: exercicio.tipo_exercicio,
                     })
                     .from(sessao_serie)
+                    .innerJoin(sessao_exercicio, eq(sessao_serie.sessao_exercicio_id, sessao_exercicio.id))
+                    .innerJoin(treino_exercicio, eq(sessao_exercicio.treino_exercicio_id, treino_exercicio.id))
+                    .innerJoin(exercicio, eq(treino_exercicio.exercicio_id, exercicio.id))
                     .where(inArray(sessao_serie.sessao_exercicio_id, exercicioIds))
                 : [];
 
@@ -396,6 +426,35 @@ class SessaoRepository {
                 return acc;
             }, 0);
 
+            const tempo_total_isometria_segundos = seriesRows.reduce((acc, s) => {
+                if (s.status === 'CONCLUIDA' && s.tipo_exercicio === 'TEMPO' && s.tempo_realizado_segundos) {
+                    return acc + s.tempo_realizado_segundos;
+                }
+                return acc;
+            }, 0);
+
+            const distancia_total_metros = seriesRows.reduce((acc, s) => {
+                if (s.status === 'CONCLUIDA' && s.tipo_exercicio === 'DISTANCIA' && s.distancia_realizada_metros) {
+                    return acc + s.distancia_realizada_metros;
+                }
+                return acc;
+            }, 0);
+
+            // Pace médio: tempo total dist / distancia total dist (segundos/km)
+            const tempoSeriesDistancia = seriesRows.reduce((acc, s) => {
+                if (s.status === 'CONCLUIDA' && s.tipo_exercicio === 'DISTANCIA' && s.tempo_realizado_segundos && s.distancia_realizada_metros) {
+                    return acc + s.tempo_realizado_segundos;
+                }
+                return acc;
+            }, 0);
+            const distanciaParaPace = seriesRows.reduce((acc, s) => {
+                if (s.status === 'CONCLUIDA' && s.tipo_exercicio === 'DISTANCIA' && s.tempo_realizado_segundos && s.distancia_realizada_metros) {
+                    return acc + s.distancia_realizada_metros;
+                }
+                return acc;
+            }, 0);
+            const pace_medio_segundos_por_km = calcularPace(tempoSeriesDistancia, distanciaParaPace);
+
             const taxa_conclusao = series_total > 0
                 ? Math.round((series_concluidas / series_total) * 100)
                 : 0;
@@ -407,6 +466,9 @@ class SessaoRepository {
                 series_concluidas,
                 series_total,
                 volume_total_kg: Math.round(volume_total_kg * 100) / 100,
+                tempo_total_isometria_segundos,
+                distancia_total_metros,
+                pace_medio_segundos_por_km,
                 taxa_conclusao,
             };
         } catch (error) {
@@ -420,6 +482,8 @@ class SessaoRepository {
             numero_serie: number;
             repeticoes_realizadas?: number | null;
             carga_utilizada?: string | null;
+            tempo_realizado_segundos?: number | null;
+            distancia_realizada_metros?: number | null;
             status: 'PENDENTE' | 'CONCLUIDA' | 'PULADA';
             observacoes?: string | null;
         }[],
@@ -504,11 +568,17 @@ class SessaoRepository {
         }
     }
 
-    async findSessaoExercicio(sessaoId: string, exercicioId: string): Promise<{ id: string; sessao_treino_id: string } | null> {
+    async findSessaoExercicio(sessaoId: string, exercicioId: string): Promise<{ id: string; sessao_treino_id: string; tipo_exercicio: enum_tipo_exercicio } | null> {
         try {
             const rows = await this.db
-                .select({ id: sessao_exercicio.id, sessao_treino_id: sessao_exercicio.sessao_treino_id })
+                .select({
+                    id: sessao_exercicio.id,
+                    sessao_treino_id: sessao_exercicio.sessao_treino_id,
+                    tipo_exercicio: exercicio.tipo_exercicio,
+                })
                 .from(sessao_exercicio)
+                .innerJoin(treino_exercicio, eq(sessao_exercicio.treino_exercicio_id, treino_exercicio.id))
+                .innerJoin(exercicio, eq(treino_exercicio.exercicio_id, exercicio.id))
                 .where(
                     and(
                         eq(sessao_exercicio.sessao_treino_id, sessaoId),

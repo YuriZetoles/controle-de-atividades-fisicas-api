@@ -32,6 +32,11 @@ const exercicioSchema = z.object({
         .nullable()
         .optional()
         .openapi({ description: "UUID do aluno (null para exercício global)", example: "550e8400-e29b-41d4-a716-446655440000" }),
+    tipo_exercicio: z
+        .enum(['REPETICAO', 'TEMPO', 'DISTANCIA'], { message: "tipo_exercicio deve ser 'REPETICAO', 'TEMPO' ou 'DISTANCIA'" })
+        .default('REPETICAO')
+        .optional()
+        .openapi({ description: "Tipo de medição do exercício. REPETICAO=conta repetições; TEMPO=cronometra sustentação (ex: prancha); DISTANCIA=distância percorrida (ex: corrida).", example: "REPETICAO" }),
     musculos: z
         .array(z.object({
             musculo_id: z.string().uuid({ message: "O ID do músculo deve ser um UUID válido" })
@@ -70,6 +75,10 @@ const exercicioUpdateSchema = z.object({
         .nullable()
         .optional()
         .openapi({ description: "URL da animação (WebM) do exercício", example: "https://bucket.com/animacoes/supino.webm" }),
+    tipo_exercicio: z
+        .enum(['REPETICAO', 'TEMPO', 'DISTANCIA'], { message: "tipo_exercicio deve ser 'REPETICAO', 'TEMPO' ou 'DISTANCIA'" })
+        .optional()
+        .openapi({ description: "Tipo de medição do exercício", example: "TEMPO" }),
     musculos: z
         .array(z.object({
             musculo_id: z.string().uuid({ message: "O ID do músculo deve ser um UUID válido" })
@@ -105,6 +114,10 @@ const exercicioQuerySchema = z.object({
         .enum(['PRIMARIO', 'SECUNDARIO'])
         .optional()
         .openapi({ description: "Filtrar por tipo de ativação muscular", example: "PRIMARIO" }),
+    tipo_exercicio: z
+        .enum(['REPETICAO', 'TEMPO', 'DISTANCIA'])
+        .optional()
+        .openapi({ description: "Filtrar por tipo de medição do exercício", example: "TEMPO" }),
     aluno_id: z
         .string()
         .uuid({ message: 'aluno_id deve ser um UUID válido' })

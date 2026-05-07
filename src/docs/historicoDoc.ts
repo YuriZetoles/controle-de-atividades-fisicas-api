@@ -10,6 +10,22 @@ const EstatisticasResponse = z.object({
     tempo_total_minutos: z.number().openapi({ example: 1320 }),
     media_duracao_minutos: z.number().openapi({ example: 66 }),
     volume_total_kg: z.number().openapi({ example: 48250.75 }),
+    tempo_total_isometria_segundos: z.number().openapi({
+        description: "Soma do tempo realizado de séries CONCLUIDAS de exercícios tipo TEMPO no período",
+        example: 1845,
+    }),
+    media_tempo_isometria_segundos: z.number().openapi({
+        description: "Média de tempo por série CONCLUIDA de exercícios tipo TEMPO",
+        example: 47,
+    }),
+    distancia_total_metros: z.number().openapi({
+        description: "Soma da distância realizada de séries CONCLUIDAS de exercícios tipo DISTANCIA",
+        example: 32500,
+    }),
+    media_distancia_metros: z.number().openapi({
+        description: "Média de distância por série CONCLUIDA de exercícios tipo DISTANCIA",
+        example: 5400,
+    }),
     sequencia_atual: z.number().openapi({ example: 5 }),
     melhor_sequencia: z.number().openapi({ example: 12 }),
     treinos_por_semana_media: z.number().openapi({ example: 3.5 }),
@@ -18,10 +34,38 @@ const EstatisticasResponse = z.object({
 const ProgressaoItemResponse = z.object({
     data: z.coerce.date().openapi({ example: "2026-03-27T10:00:00.000Z" }),
     sessao_id: z.string().uuid().openapi({ example: "550e8400-e29b-41d4-a716-446655440000" }),
-    maior_carga: z.number().nullable().openapi({ example: 100.0 }),
-    media_repeticoes: z.number().nullable().openapi({ example: 10.5 }),
-    volume_total: z.number().openapi({ example: 1260.0 }),
+    tipo_exercicio: z.enum(['REPETICAO', 'TEMPO', 'DISTANCIA']).openapi({
+        description: "Tipo de medição do exercício — define quais campos são relevantes",
+        example: "REPETICAO",
+    }),
+    maior_carga: z.number().nullable().openapi({ description: "REPETICAO: maior carga em kg na sessão", example: 100.0 }),
+    media_repeticoes: z.number().nullable().openapi({ description: "REPETICAO: média de reps", example: 10.5 }),
+    volume_total: z.number().openapi({ description: "REPETICAO: volume total kg na sessão", example: 1260.0 }),
+    melhor_tempo_segundos: z.number().nullable().openapi({ description: "TEMPO: melhor tempo sustentado", example: 65 }),
+    media_tempo_segundos: z.number().nullable().openapi({ description: "TEMPO: média de tempo por série", example: 50 }),
+    tempo_total_segundos: z.number().openapi({ description: "TEMPO: soma do tempo na sessão", example: 150 }),
+    maior_distancia_metros: z.number().nullable().openapi({ description: "DISTANCIA: maior distância", example: 5200 }),
+    media_distancia_metros: z.number().nullable().openapi({ description: "DISTANCIA: média de distância por série", example: 5000 }),
+    distancia_total_metros: z.number().openapi({ description: "DISTANCIA: soma de distância na sessão", example: 5200 }),
+    melhor_pace_segundos_por_km: z.number().nullable().openapi({ description: "DISTANCIA: melhor pace (menor segundos/km) na sessão", example: 360 }),
+    pace_medio_segundos_por_km: z.number().nullable().openapi({ description: "DISTANCIA: pace médio na sessão", example: 380 }),
 }).openapi("ProgressaoItem");
+
+const RecordeExercicioResponse = z.object({
+    exercicio_id: z.string().uuid(),
+    nome: z.string().openapi({ example: "Supino Reto" }),
+    tipo_exercicio: z.enum(['REPETICAO', 'TEMPO', 'DISTANCIA']).openapi({ example: 'REPETICAO' }),
+    total_sessoes: z.number().openapi({ example: 12 }),
+    maior_carga_kg: z.number().nullable().openapi({ description: "REPETICAO: maior carga atingida (kg)", example: 100 }),
+    repeticoes_no_pr: z.number().nullable().openapi({ description: "REPETICAO: repetições realizadas no PR de carga", example: 5 }),
+    data_pr_carga: z.coerce.date().nullable().openapi({ description: "REPETICAO: data do PR de carga", example: "2026-03-15T10:00:00.000Z" }),
+    melhor_tempo_segundos: z.number().nullable().openapi({ description: "TEMPO: maior tempo sustentado", example: 95 }),
+    data_pr_tempo: z.coerce.date().nullable().openapi({ example: "2026-03-15T10:00:00.000Z" }),
+    maior_distancia_metros: z.number().nullable().openapi({ description: "DISTANCIA: maior distância", example: 10000 }),
+    data_pr_distancia: z.coerce.date().nullable().openapi({ example: "2026-03-15T10:00:00.000Z" }),
+    melhor_pace_segundos_por_km: z.number().nullable().openapi({ description: "DISTANCIA: melhor pace (menor s/km)", example: 320 }),
+    data_pr_pace: z.coerce.date().nullable().openapi({ example: "2026-03-15T10:00:00.000Z" }),
+}).openapi("RecordeExercicio");
 
 // GET /historico/estatisticas
 historicoRegistry.registerPath({
@@ -129,15 +173,26 @@ const GrupoMuscularItemResponse = z.object({
     grupo_muscular: z.string().openapi({ example: "PEITO" }),
     total_series: z.number().openapi({ example: 48 }),
     volume_total_kg: z.number().openapi({ example: 5760.0 }),
+    tempo_total_segundos: z.number().openapi({
+        description: "Tempo total sustentado em séries de exercícios tipo TEMPO neste grupo",
+        example: 600,
+    }),
+    distancia_total_metros: z.number().openapi({
+        description: "Distância total em séries de exercícios tipo DISTANCIA neste grupo",
+        example: 0,
+    }),
     percentual: z.number().openapi({ example: 22.5 }),
 }).openapi("GrupoMuscularItem");
 
 const ExercicioFrequenteItemResponse = z.object({
     exercicio_id: z.string().uuid().openapi({ example: "550e8400-e29b-41d4-a716-446655440003" }),
     nome: z.string().openapi({ example: "Supino Reto" }),
+    tipo_exercicio: z.enum(['REPETICAO', 'TEMPO', 'DISTANCIA']).openapi({ example: 'REPETICAO' }),
     total_sessoes: z.number().openapi({ example: 12 }),
     total_series: z.number().openapi({ example: 48 }),
     volume_total_kg: z.number().openapi({ example: 5760.0 }),
+    tempo_total_segundos: z.number().openapi({ example: 0 }),
+    distancia_total_metros: z.number().openapi({ example: 0 }),
 }).openapi("ExercicioFrequenteItem");
 
 const PeriodoComparativoResponse = EstatisticasResponse.omit({
@@ -157,6 +212,10 @@ const ComparativoResponse = z.object({
         sessoes_concluidas_abs: z.number().openapi({ example: 2 }),
         volume_total_kg_pct: z.number().nullable().openapi({ example: 12.5 }),
         volume_total_kg_abs: z.number().openapi({ example: 1680.0 }),
+        tempo_total_isometria_pct: z.number().nullable().openapi({ example: 18.0 }),
+        tempo_total_isometria_abs: z.number().openapi({ example: 240 }),
+        distancia_total_metros_pct: z.number().nullable().openapi({ example: 5.0 }),
+        distancia_total_metros_abs: z.number().openapi({ example: 1500 }),
         media_duracao_minutos_pct: z.number().nullable().openapi({ example: -5.0 }),
         media_duracao_minutos_abs: z.number().openapi({ example: -3 }),
         treinos_por_semana_pct: z.number().nullable().openapi({ example: 33.3 }),
@@ -296,5 +355,49 @@ Os campos \`periodo_atual_inicio/fim\` e \`periodo_anterior_inicio/fim\` retorna
         401: { description: "Não autorizado" },
         403: { description: "Sem permissão para visualizar este histórico" },
         422: { description: "aluno_id obrigatório para admin/treinador / erro de validação" },
+    },
+});
+
+
+// GET /historico/recordes/{exercicioId}
+historicoRegistry.registerPath({
+    method: "get",
+    path: "/historico/recordes/{exercicioId}",
+    summary: "Recorde pessoal (PR) por exercício",
+    description: `Retorna o recorde pessoal do aluno em um exercício específico, conforme o tipo:
+- REPETICAO: maior carga + reps usadas no PR
+- TEMPO: maior tempo sustentado em uma série
+- DISTANCIA: maior distância + melhor pace (menor segundos/km)
+
+Cada recorde inclui a data da sessão em que foi atingido.`,
+    tags: ["Historico"],
+    security: [{ BearerAuth: [] }],
+    request: {
+        params: z.object({
+            exercicioId: z.string().uuid().openapi({ example: "550e8400-e29b-41d4-a716-446655440003" }),
+        }),
+        query: z.object({
+            aluno_id: z.string().uuid().optional().openapi({ example: "550e8400-e29b-41d4-a716-446655440001", description: "Filtra por aluno (obrigatório para admin e treinador)" }),
+        }),
+    },
+    responses: {
+        200: {
+            description: "Recorde do exercício",
+            content: {
+                "application/json": {
+                    schema: z.object({
+                        error: z.boolean().openapi({ example: false }),
+                        code: z.number().openapi({ example: 200 }),
+                        message: z.string().nullable().openapi({ example: null }),
+                        data: RecordeExercicioResponse,
+                        errors: z.array(z.any()),
+                    }),
+                },
+            },
+        },
+        401: { description: "Não autorizado" },
+        403: { description: "Sem permissão para visualizar este histórico" },
+        404: { description: "Exercício não encontrado" },
+        422: { description: "Erro de validação" },
     },
 });

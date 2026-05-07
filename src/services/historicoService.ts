@@ -1,4 +1,4 @@
-import HistoricoRepository, { EstatisticasHistorico, ProgressaoItem, GrupoMuscularItem, ExercicioFrequenteItem } from '../repositories/historicoRepository';
+import HistoricoRepository, { EstatisticasHistorico, ProgressaoItem, GrupoMuscularItem, ExercicioFrequenteItem, RecordeExercicio } from '../repositories/historicoRepository';
 import UsuarioRepository from '../repositories/usuarioRepository';
 import {
     historicoEstatisticasQuerySchema,
@@ -6,11 +6,13 @@ import {
     historicoExercicioIdSchema,
     historicoGruposMuscularesQuerySchema,
     historicoExerciciosFrequentesQuerySchema,
+    historicoRecordeQuerySchema,
     historicoComparativoQuerySchema,
     HistoricoEstatisticasQuery,
     HistoricoProgressaoQuery,
     HistoricoGruposMuscularesQuery,
     HistoricoExerciciosFrequentesQuery,
+    HistoricoRecordeQuery,
     HistoricoComparativoQuery,
 } from '../utils/validations/historicoValidation';
 
@@ -73,10 +75,21 @@ class HistoricoService {
         return this.repository.getGruposMusculares(alunoId, filtros.data_inicio, filtros.data_fim);
     }
 
+    async getRecordeExercicio(exercicioIdParam: string, query: any, userId: string): Promise<RecordeExercicio> {
+        const exercicioId = historicoExercicioIdSchema.parse(exercicioIdParam);
+        const filtros: HistoricoRecordeQuery = historicoRecordeQuerySchema.parse(query);
+        const alunoId = await this._resolverAlunoId(userId, filtros.aluno_id);
+        const recorde = await this.repository.getRecordeExercicio(alunoId, exercicioId);
+        if (!recorde) {
+            throw new Error('Exercício não encontrado');
+        }
+        return recorde;
+    }
+
     async getExerciciosFrequentes(query: any, userId: string): Promise<ExercicioFrequenteItem[]> {
         const filtros: HistoricoExerciciosFrequentesQuery = historicoExerciciosFrequentesQuerySchema.parse(query);
         const alunoId = await this._resolverAlunoId(userId, filtros.aluno_id);
-        return this.repository.getExerciciosFrequentes(alunoId, filtros.data_inicio, filtros.data_fim, filtros.limite);
+        return this.repository.getExerciciosFrequentes(alunoId, filtros.data_inicio, filtros.data_fim, filtros.limite, filtros.tipo_exercicio);
     }
 
     async getComparativo(query: any, userId: string): Promise<{
@@ -91,6 +104,10 @@ class HistoricoService {
             sessoes_concluidas_abs: number;
             volume_total_kg_pct: number | null;
             volume_total_kg_abs: number;
+            tempo_total_isometria_pct: number | null;
+            tempo_total_isometria_abs: number;
+            distancia_total_metros_pct: number | null;
+            distancia_total_metros_abs: number;
             media_duracao_minutos_pct: number | null;
             media_duracao_minutos_abs: number;
             treinos_por_semana_pct: number | null;
@@ -133,6 +150,10 @@ class HistoricoService {
                 sessoes_concluidas_abs: statsAtual.sessoes_concluidas - statsAnterior.sessoes_concluidas,
                 volume_total_kg_pct: variacaoPct(statsAtual.volume_total_kg, statsAnterior.volume_total_kg),
                 volume_total_kg_abs: Math.round((statsAtual.volume_total_kg - statsAnterior.volume_total_kg) * 100) / 100,
+                tempo_total_isometria_pct: variacaoPct(statsAtual.tempo_total_isometria_segundos, statsAnterior.tempo_total_isometria_segundos),
+                tempo_total_isometria_abs: statsAtual.tempo_total_isometria_segundos - statsAnterior.tempo_total_isometria_segundos,
+                distancia_total_metros_pct: variacaoPct(statsAtual.distancia_total_metros, statsAnterior.distancia_total_metros),
+                distancia_total_metros_abs: statsAtual.distancia_total_metros - statsAnterior.distancia_total_metros,
                 media_duracao_minutos_pct: variacaoPct(statsAtual.media_duracao_minutos, statsAnterior.media_duracao_minutos),
                 media_duracao_minutos_abs: statsAtual.media_duracao_minutos - statsAnterior.media_duracao_minutos,
                 treinos_por_semana_pct: variacaoPct(statsAtual.treinos_por_semana_media, statsAnterior.treinos_por_semana_media),

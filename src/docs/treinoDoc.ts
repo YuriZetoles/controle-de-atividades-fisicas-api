@@ -32,14 +32,29 @@ const TreinoIdParam = z.object({
 const TreinoExercicioResponse = z.object({
     id: z.string().uuid().openapi({ example: '550e8400-e29b-41d4-a716-446655440020' }),
     series: z.number().openapi({ example: 4 }),
-    repeticoes: z.string().openapi({ example: '8-12' }),
+    repeticoes: z.string().nullable().openapi({
+        description: 'Faixa de repetições. Preenchido para exercícios tipo REPETICAO; null para TEMPO/DISTANCIA.',
+        example: '8-12',
+    }),
     carga_sugerida: z.string().nullable().openapi({ example: '30.00' }),
+    duracao_sugerida_segundos: z.number().nullable().openapi({
+        description: 'Duração sugerida em segundos. Preenchido para exercícios tipo TEMPO; null caso contrário.',
+        example: 45,
+    }),
+    distancia_sugerida_metros: z.number().nullable().openapi({
+        description: 'Distância sugerida em metros. Preenchido para exercícios tipo DISTANCIA; null caso contrário.',
+        example: 5000,
+    }),
     tempo_descanso_segundos: z.number().openapi({ example: 90 }),
     ordem_execucao: z.number().openapi({ example: 1 }),
     exercicio: z.object({
         id: z.string().uuid().openapi({ example: '550e8400-e29b-41d4-a716-446655440030' }),
         nome: z.string().openapi({ example: 'Supino Reto' }),
         descricao: z.string().nullable().openapi({ example: 'Exercício para peitorais' }),
+        tipo_exercicio: z.enum(['REPETICAO', 'TEMPO', 'DISTANCIA']).openapi({
+            description: 'Tipo de medição do exercício',
+            example: 'REPETICAO',
+        }),
         musculos: z.array(
             z.object({
                 musculo_id: z.string().uuid().openapi({ example: '550e8400-e29b-41d4-a716-446655440040' }),

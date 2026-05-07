@@ -67,12 +67,16 @@ let musculoCostasId: string;
 let exercicio1Id: string;     // PEITO
 let exercicio2Id: string;     // COSTAS
 let exercicioMultiId: string; // PEITO + COSTAS
+let exercicioTempoId: string;
+let exercicioDistanciaId: string;
 
 // Treinos
 let treinoAluno1Id: string;  // aluno1: exercicio1(3s) + exercicio2(3s), treinador1
 let treinoAluno2Id: string;  // aluno2: exercicio1(3s)
 let treinoPeitoId: string;   // aluno1: exercicio1(3s) apenas, treinador1
 let treinoMultiId: string;   // aluno1: exercicioMulti(3s), treinador1
+let treinoTempoId: string;
+let treinoDistanciaId: string;
 
 const INVALID_UUID = 'nao-e-uuid';
 const NOT_FOUND_UUID = '00000000-0000-0000-0000-000000000000';
@@ -164,6 +168,8 @@ async function dbCriarSessao(
         serieStatus?: 'PENDENTE' | 'CONCLUIDA' | 'PULADA';
         carga?: number | null;
         reps?: number | null;
+        tempoSegundos?: number | null;
+        distanciaMetros?: number | null;
     } = {},
 ): Promise<string> {
     const inicio = opts.inicio ?? new Date();
@@ -207,6 +213,8 @@ async function dbCriarSessao(
                 status: serieStatus,
                 carga_utilizada: serieStatus === 'CONCLUIDA' && carga !== null ? String(carga) : null,
                 repeticoes_realizadas: serieStatus === 'CONCLUIDA' && reps !== null ? reps : null,
+                tempo_realizado_segundos: serieStatus === 'CONCLUIDA' && opts.tempoSegundos != null ? opts.tempoSegundos : null,
+                distancia_realizada_metros: serieStatus === 'CONCLUIDA' && opts.distanciaMetros != null ? opts.distanciaMetros : null,
             });
         }
     }
@@ -340,6 +348,23 @@ beforeAll(async () => {
     treinoMultiId = tMulti.id;
     await DataBase.insert(treino_exercicio).values({ treino_id: treinoMultiId, exercicio_id: exercicioMultiId, series: 3, repeticoes: '10', tempo_descanso_segundos: 60, ordem_execucao: 1 });
 
+    // Exercícios TEMPO + DISTANCIA + treinos correspondentes
+    const [exTempo] = await DataBase.insert(exercicio).values({ nome: `Prancha HT ${RUN_ID}`, aluno_id: null, tipo_exercicio: 'TEMPO' }).returning({ id: exercicio.id });
+    exercicioTempoId = exTempo.id;
+    await DataBase.insert(exercicio_musculo).values({ exercicio_id: exercicioTempoId, musculo_id: musculoPeitoId, tipo_ativacao: 'PRIMARIO' });
+
+    const [exDist] = await DataBase.insert(exercicio).values({ nome: `Corrida HT ${RUN_ID}`, aluno_id: null, tipo_exercicio: 'DISTANCIA' }).returning({ id: exercicio.id });
+    exercicioDistanciaId = exDist.id;
+    await DataBase.insert(exercicio_musculo).values({ exercicio_id: exercicioDistanciaId, musculo_id: musculoCostasId, tipo_ativacao: 'PRIMARIO' });
+
+    const [tTempo] = await DataBase.insert(treino).values({ nome: `Treino Tempo HT ${RUN_ID}`, usuario_id: alunoId, treinador_id: treinadorRecId }).returning({ id: treino.id });
+    treinoTempoId = tTempo.id;
+    await DataBase.insert(treino_exercicio).values({ treino_id: treinoTempoId, exercicio_id: exercicioTempoId, series: 2, duracao_sugerida_segundos: 45, tempo_descanso_segundos: 60, ordem_execucao: 1 });
+
+    const [tDist] = await DataBase.insert(treino).values({ nome: `Treino Dist HT ${RUN_ID}`, usuario_id: alunoId, treinador_id: treinadorRecId }).returning({ id: treino.id });
+    treinoDistanciaId = tDist.id;
+    await DataBase.insert(treino_exercicio).values({ treino_id: treinoDistanciaId, exercicio_id: exercicioDistanciaId, series: 1, distancia_sugerida_metros: 5000, tempo_descanso_segundos: 0, ordem_execucao: 1 });
+
     asAdmin();
 }, 30000);
 
@@ -353,11 +378,11 @@ afterAll(async () => {
     }
 
     // 2. Treinos (cascade → treino_exercicio)
-    await DataBase.delete(treino).where(inArray(treino.id, [treinoAluno1Id, treinoAluno2Id, treinoPeitoId, treinoMultiId])).catch(() => {});
+    await DataBase.delete(treino).where(inArray(treino.id, [treinoAluno1Id, treinoAluno2Id, treinoPeitoId, treinoMultiId, treinoTempoId, treinoDistanciaId])).catch(() => {});
 
     // 3. Exercícios e vínculos musculares
-    await DataBase.delete(exercicio_musculo).where(inArray(exercicio_musculo.exercicio_id, [exercicio1Id, exercicio2Id, exercicioMultiId])).catch(() => {});
-    await DataBase.delete(exercicio).where(inArray(exercicio.id, [exercicio1Id, exercicio2Id, exercicioMultiId])).catch(() => {});
+    await DataBase.delete(exercicio_musculo).where(inArray(exercicio_musculo.exercicio_id, [exercicio1Id, exercicio2Id, exercicioMultiId, exercicioTempoId, exercicioDistanciaId])).catch(() => {});
+    await DataBase.delete(exercicio).where(inArray(exercicio.id, [exercicio1Id, exercicio2Id, exercicioMultiId, exercicioTempoId, exercicioDistanciaId])).catch(() => {});
 
     // 4. Músculos
     await DataBase.delete(musculo).where(inArray(musculo.id, [musculoPeitoId, musculoCostasId])).catch(() => {});
@@ -417,6 +442,10 @@ describe('GET /historico/estatisticas', () => {
             tempo_total_minutos: expect.any(Number),
             media_duracao_minutos: expect.any(Number),
             volume_total_kg: expect.any(Number),
+            tempo_total_isometria_segundos: expect.any(Number),
+            media_tempo_isometria_segundos: expect.any(Number),
+            distancia_total_metros: expect.any(Number),
+            media_distancia_metros: expect.any(Number),
             sequencia_atual: expect.any(Number),
             melhor_sequencia: expect.any(Number),
             treinos_por_semana_media: expect.any(Number),
@@ -1699,5 +1728,164 @@ describe('GET /historico/comparativo', () => {
         const res = await request(app).get('/api/historico/comparativo');
 
         expect(res.status).toBe(401);
+    });
+});
+
+// Histórico — métricas TEMPO + DISTANCIA
+
+describe('Histórico com exercícios TEMPO/DISTANCIA', () => {
+    const sessoesTD: string[] = [];
+
+    beforeAll(async () => {
+        const hoje = new Date();
+        const ontem = new Date(hoje.getTime() - DAY_MS);
+        sessoesTD.push(await dbCriarSessao(alunoId, treinoTempoId, { inicio: hoje, tempoSegundos: 45, carga: null, reps: null }));
+        sessoesTD.push(await dbCriarSessao(alunoId, treinoTempoId, { inicio: ontem, tempoSegundos: 60, carga: null, reps: null }));
+        sessoesTD.push(await dbCriarSessao(alunoId, treinoDistanciaId, { inicio: hoje, distanciaMetros: 5200, carga: null, reps: null }));
+    });
+
+    afterAll(async () => {
+        for (const id of sessoesTD) await dbDeletarSessao(id);
+        sessoesTD.length = 0;
+    });
+
+    it('estatísticas inclui tempo_total_isometria + distancia_total > 0', async () => {
+        asAluno();
+        const res = await request(app).get('/api/historico/estatisticas');
+
+        expect(res.status).toBe(200);
+        // 2 sessões TEMPO × 2 séries × (45 ou 60) = 90 + 120 = 210
+        expect(res.body.data.tempo_total_isometria_segundos).toBeGreaterThanOrEqual(210);
+        expect(res.body.data.distancia_total_metros).toBeGreaterThanOrEqual(5200);
+        expect(res.body.data.media_tempo_isometria_segundos).toBeGreaterThan(0);
+    });
+
+    it('progressao TEMPO retorna tipo_exercicio TEMPO + métricas de tempo', async () => {
+        asAluno();
+        const res = await request(app).get(`/api/historico/progressao/${exercicioTempoId}`);
+
+        expect(res.status).toBe(200);
+        expect(Array.isArray(res.body.data)).toBe(true);
+        expect(res.body.data.length).toBeGreaterThan(0);
+        const item = res.body.data[0];
+        expect(item.tipo_exercicio).toBe('TEMPO');
+        expect(item.melhor_tempo_segundos).toBeGreaterThan(0);
+        expect(item.tempo_total_segundos).toBeGreaterThan(0);
+    });
+
+    it('progressao DISTANCIA retorna tipo_exercicio DISTANCIA + métricas distancia', async () => {
+        asAluno();
+        const res = await request(app).get(`/api/historico/progressao/${exercicioDistanciaId}`);
+
+        expect(res.status).toBe(200);
+        expect(res.body.data.length).toBeGreaterThan(0);
+        const item = res.body.data[0];
+        expect(item.tipo_exercicio).toBe('DISTANCIA');
+        expect(item.maior_distancia_metros).toBe(5200);
+    });
+
+    it('exercicios-frequentes inclui tipo_exercicio + tempo_total + distancia_total', async () => {
+        asAluno();
+        const res = await request(app).get('/api/historico/exercicios-frequentes?limite=50');
+
+        expect(res.status).toBe(200);
+        const exTempo = res.body.data.find((e: any) => e.exercicio_id === exercicioTempoId);
+        expect(exTempo).toBeDefined();
+        expect(exTempo.tipo_exercicio).toBe('TEMPO');
+        expect(exTempo.tempo_total_segundos).toBeGreaterThan(0);
+
+        const exDist = res.body.data.find((e: any) => e.exercicio_id === exercicioDistanciaId);
+        expect(exDist).toBeDefined();
+        expect(exDist.tipo_exercicio).toBe('DISTANCIA');
+        expect(exDist.distancia_total_metros).toBe(5200);
+    });
+
+    it('grupos-musculares inclui tempo_total_segundos + distancia_total_metros', async () => {
+        asAluno();
+        const res = await request(app).get('/api/historico/grupos-musculares');
+
+        expect(res.status).toBe(200);
+        for (const item of res.body.data) {
+            expect(item).toHaveProperty('tempo_total_segundos');
+            expect(item).toHaveProperty('distancia_total_metros');
+        }
+    });
+
+    it('comparativo inclui variações tempo_total_isometria + distancia_total_metros', async () => {
+        asAluno();
+        const res = await request(app).get('/api/historico/comparativo');
+
+        expect(res.status).toBe(200);
+        expect(res.body.data.variacao).toHaveProperty('tempo_total_isometria_pct');
+        expect(res.body.data.variacao).toHaveProperty('tempo_total_isometria_abs');
+        expect(res.body.data.variacao).toHaveProperty('distancia_total_metros_pct');
+        expect(res.body.data.variacao).toHaveProperty('distancia_total_metros_abs');
+    });
+
+    it('progressao DISTANCIA inclui pace (melhor + médio)', async () => {
+        // Criar sessão DISTANCIA com tempo + distancia para gerar pace
+        const sId = await dbCriarSessao(alunoId, treinoDistanciaId, {
+            inicio: new Date(),
+            distanciaMetros: 5000,
+            tempoSegundos: 1800, // pace 360 s/km
+            carga: null,
+            reps: null,
+        });
+
+        asAluno();
+        const res = await request(app).get(`/api/historico/progressao/${exercicioDistanciaId}`);
+
+        expect(res.status).toBe(200);
+        const item = res.body.data.find((i: any) => i.sessao_id === sId);
+        expect(item).toBeDefined();
+        expect(item.melhor_pace_segundos_por_km).toBeGreaterThan(0);
+        expect(item.pace_medio_segundos_por_km).toBeGreaterThan(0);
+
+        await dbDeletarSessao(sId);
+    });
+
+    it('exercicios-frequentes filtra por tipo_exercicio=TEMPO → só TEMPO', async () => {
+        asAluno();
+        const res = await request(app).get('/api/historico/exercicios-frequentes?tipo_exercicio=TEMPO&limite=50');
+
+        expect(res.status).toBe(200);
+        for (const item of res.body.data) {
+            expect(item.tipo_exercicio).toBe('TEMPO');
+        }
+    });
+
+    it('GET /historico/recordes/:exercicioId DISTANCIA retorna PR com pace', async () => {
+        const sId = await dbCriarSessao(alunoId, treinoDistanciaId, {
+            inicio: new Date(),
+            distanciaMetros: 10000,
+            tempoSegundos: 3000, // pace 300 s/km
+            carga: null,
+            reps: null,
+        });
+
+        asAluno();
+        const res = await request(app).get(`/api/historico/recordes/${exercicioDistanciaId}`);
+
+        expect(res.status).toBe(200);
+        expect(res.body.data.tipo_exercicio).toBe('DISTANCIA');
+        expect(res.body.data.maior_distancia_metros).toBeGreaterThanOrEqual(10000);
+        expect(res.body.data.melhor_pace_segundos_por_km).toBeGreaterThan(0);
+
+        await dbDeletarSessao(sId);
+    });
+
+    it('GET /historico/recordes/:exercicioId TEMPO retorna melhor_tempo', async () => {
+        asAluno();
+        const res = await request(app).get(`/api/historico/recordes/${exercicioTempoId}`);
+
+        expect(res.status).toBe(200);
+        expect(res.body.data.tipo_exercicio).toBe('TEMPO');
+        expect(res.body.data.melhor_tempo_segundos).toBeGreaterThan(0);
+    });
+
+    it('GET /historico/recordes/:exercicioId exercicio inexistente → 404', async () => {
+        asAluno();
+        const res = await request(app).get(`/api/historico/recordes/${NOT_FOUND_UUID}`);
+        expect(res.status).toBe(404);
     });
 });

@@ -4,6 +4,7 @@ import { exercicio, exercicio_musculo, musculo, treino_exercicio } from '../../c
 
 type GrupoMuscular = 'PEITO' | 'COSTAS' | 'PERNAS' | 'BRAÇOS' | 'OMBROS' | 'ABDOMEN' | 'PESCOÇO' | 'CARDIO';
 type TipoAtivacao = 'PRIMARIO' | 'SECUNDARIO';
+type TipoExercicio = 'REPETICAO' | 'TEMPO' | 'DISTANCIA';
 
 class ExercicioFilterBuilder {
     private condicoes: SQL[] = [];
@@ -98,6 +99,13 @@ class ExercicioFilterBuilder {
                 );
 
             this.condicoes.push(inArray(exercicio.id, subquery));
+        }
+        return this;
+    }
+
+    comTipoExercicio(tipo_exercicio?: TipoExercicio) {
+        if (tipo_exercicio) {
+            this.condicoes.push(eq(exercicio.tipo_exercicio, tipo_exercicio));
         }
         return this;
     }
