@@ -20,6 +20,10 @@ export interface EstatisticasHistorico {
     tempo_total_minutos: number;
     media_duracao_minutos: number;
     volume_total_kg: number;
+    tempo_total_isometria_segundos: number;
+    media_tempo_isometria_segundos: number;
+    distancia_total_metros: number;
+    media_distancia_metros: number;
     sequencia_atual: number;
     melhor_sequencia: number;
     treinos_por_semana_media: number;
@@ -28,24 +32,57 @@ export interface EstatisticasHistorico {
 export interface ProgressaoItem {
     data: Date;
     sessao_id: string;
+    tipo_exercicio: 'REPETICAO' | 'TEMPO' | 'DISTANCIA';
     maior_carga: number | null;
     media_repeticoes: number | null;
     volume_total: number;
+    melhor_tempo_segundos: number | null;
+    media_tempo_segundos: number | null;
+    tempo_total_segundos: number;
+    maior_distancia_metros: number | null;
+    media_distancia_metros: number | null;
+    distancia_total_metros: number;
+    melhor_pace_segundos_por_km: number | null;
+    pace_medio_segundos_por_km: number | null;
 }
 
 export interface GrupoMuscularItem {
     grupo_muscular: string;
     total_series: number;
     volume_total_kg: number;
+    tempo_total_segundos: number;
+    distancia_total_metros: number;
     percentual: number;
+}
+
+export interface RecordeExercicio {
+    exercicio_id: string;
+    nome: string;
+    tipo_exercicio: 'REPETICAO' | 'TEMPO' | 'DISTANCIA';
+    total_sessoes: number;
+    // REPETICAO
+    maior_carga_kg: number | null;
+    repeticoes_no_pr: number | null;
+    data_pr_carga: Date | null;
+    // TEMPO
+    melhor_tempo_segundos: number | null;
+    data_pr_tempo: Date | null;
+    // DISTANCIA
+    maior_distancia_metros: number | null;
+    data_pr_distancia: Date | null;
+    melhor_pace_segundos_por_km: number | null;
+    data_pr_pace: Date | null;
 }
 
 export interface ExercicioFrequenteItem {
     exercicio_id: string;
     nome: string;
+    tipo_exercicio: 'REPETICAO' | 'TEMPO' | 'DISTANCIA';
     total_sessoes: number;
     total_series: number;
     volume_total_kg: number;
+    tempo_total_segundos: number;
+    distancia_total_metros: number;
 }
 
 class HistoricoRepository {
@@ -91,18 +128,27 @@ class HistoricoRepository {
                 ? Math.round(tempo_total_minutos / sessoesComDuracao.length)
                 : 0;
 
-            // 3. Volume total: séries CONCLUIDAS nas sessões do período
+            // 3. Volume total + tempo isometria + distância: séries CONCLUIDAS nas sessões do período
             const sessaoIds = sessoes.map((s) => s.id);
             let volume_total_kg = 0;
+            let tempo_total_isometria_segundos = 0;
+            let series_tempo_count = 0;
+            let distancia_total_metros = 0;
+            let series_distancia_count = 0;
 
             if (sessaoIds.length > 0) {
                 const seriesRows = await this.db
                     .select({
                         carga_utilizada: sessao_serie.carga_utilizada,
                         repeticoes_realizadas: sessao_serie.repeticoes_realizadas,
+                        tempo_realizado_segundos: sessao_serie.tempo_realizado_segundos,
+                        distancia_realizada_metros: sessao_serie.distancia_realizada_metros,
+                        tipo_exercicio: exercicio.tipo_exercicio,
                     })
                     .from(sessao_serie)
                     .innerJoin(sessao_exercicio, eq(sessao_serie.sessao_exercicio_id, sessao_exercicio.id))
+                    .innerJoin(treino_exercicio, eq(sessao_exercicio.treino_exercicio_id, treino_exercicio.id))
+                    .innerJoin(exercicio, eq(treino_exercicio.exercicio_id, exercicio.id))
                     .where(
                         and(
                             inArray(sessao_exercicio.sessao_treino_id, sessaoIds),
@@ -110,13 +156,27 @@ class HistoricoRepository {
                         ),
                     );
 
-                volume_total_kg = seriesRows.reduce((acc, s) => {
+                for (const s of seriesRows) {
                     if (s.carga_utilizada && s.repeticoes_realizadas) {
-                        return acc + parseFloat(s.carga_utilizada) * s.repeticoes_realizadas;
+                        volume_total_kg += parseFloat(s.carga_utilizada) * s.repeticoes_realizadas;
                     }
-                    return acc;
-                }, 0);
+                    if (s.tipo_exercicio === 'TEMPO' && s.tempo_realizado_segundos) {
+                        tempo_total_isometria_segundos += s.tempo_realizado_segundos;
+                        series_tempo_count++;
+                    }
+                    if (s.tipo_exercicio === 'DISTANCIA' && s.distancia_realizada_metros) {
+                        distancia_total_metros += s.distancia_realizada_metros;
+                        series_distancia_count++;
+                    }
+                }
             }
+
+            const media_tempo_isometria_segundos = series_tempo_count > 0
+                ? Math.round(tempo_total_isometria_segundos / series_tempo_count)
+                : 0;
+            const media_distancia_metros = series_distancia_count > 0
+                ? Math.round(distancia_total_metros / series_distancia_count)
+                : 0;
 
             // 4. Streaks — calculados sobre TODO o histórico 
             const todasConcluidas = await this.db
@@ -153,6 +213,10 @@ class HistoricoRepository {
                 tempo_total_minutos,
                 media_duracao_minutos,
                 volume_total_kg: Math.round(volume_total_kg * 100) / 100,
+                tempo_total_isometria_segundos,
+                media_tempo_isometria_segundos,
+                distancia_total_metros,
+                media_distancia_metros,
                 sequencia_atual,
                 melhor_sequencia,
                 treinos_por_semana_media,
@@ -170,6 +234,14 @@ class HistoricoRepository {
         limite: number = 50,
     ): Promise<ProgressaoItem[]> {
         try {
+            const [exercicioRow] = await this.db
+                .select({ tipo_exercicio: exercicio.tipo_exercicio })
+                .from(exercicio)
+                .where(eq(exercicio.id, exercicioId))
+                .limit(1);
+
+            const tipoExercicio = exercicioRow?.tipo_exercicio ?? 'REPETICAO';
+
             const rows = await this.db
                 .select({
                     sessao_id: sessao_treino.id,
@@ -181,6 +253,36 @@ class HistoricoRepository {
                             when ${sessao_serie.carga_utilizada} is not null
                              and ${sessao_serie.repeticoes_realizadas} is not null
                             then ${sessao_serie.carga_utilizada}::numeric * ${sessao_serie.repeticoes_realizadas}
+                            else 0
+                        end
+                    ), 0)`,
+                    melhor_tempo: sql<string | null>`max(${sessao_serie.tempo_realizado_segundos})`,
+                    media_tempo: sql<string | null>`avg(${sessao_serie.tempo_realizado_segundos})`,
+                    tempo_total: sql<string>`coalesce(sum(${sessao_serie.tempo_realizado_segundos}), 0)`,
+                    maior_distancia: sql<string | null>`max(${sessao_serie.distancia_realizada_metros})`,
+                    media_distancia: sql<string | null>`avg(${sessao_serie.distancia_realizada_metros})`,
+                    distancia_total: sql<string>`coalesce(sum(${sessao_serie.distancia_realizada_metros}), 0)`,
+                    melhor_pace: sql<string | null>`min(
+                        case when ${sessao_serie.tempo_realizado_segundos} is not null
+                              and ${sessao_serie.distancia_realizada_metros} is not null
+                              and ${sessao_serie.distancia_realizada_metros} > 0
+                            then (${sessao_serie.tempo_realizado_segundos}::numeric / ${sessao_serie.distancia_realizada_metros}::numeric) * 1000
+                            else null
+                        end
+                    )`,
+                    tempo_para_pace: sql<string>`coalesce(sum(
+                        case when ${sessao_serie.tempo_realizado_segundos} is not null
+                              and ${sessao_serie.distancia_realizada_metros} is not null
+                              and ${sessao_serie.distancia_realizada_metros} > 0
+                            then ${sessao_serie.tempo_realizado_segundos}
+                            else 0
+                        end
+                    ), 0)`,
+                    distancia_para_pace: sql<string>`coalesce(sum(
+                        case when ${sessao_serie.tempo_realizado_segundos} is not null
+                              and ${sessao_serie.distancia_realizada_metros} is not null
+                              and ${sessao_serie.distancia_realizada_metros} > 0
+                            then ${sessao_serie.distancia_realizada_metros}
                             else 0
                         end
                     ), 0)`,
@@ -203,15 +305,124 @@ class HistoricoRepository {
                 .orderBy(desc(sessao_treino.inicio))
                 .limit(limite);
 
-            return rows.map((r) => ({
-                data: r.data,
-                sessao_id: r.sessao_id,
-                maior_carga: r.maior_carga !== null ? Math.round(parseFloat(r.maior_carga) * 100) / 100 : null,
-                media_repeticoes: r.media_repeticoes !== null ? Math.round(parseFloat(r.media_repeticoes) * 10) / 10 : null,
-                volume_total: Math.round(parseFloat(r.volume_total) * 100) / 100,
-            }));
+            return rows.map((r) => {
+                const tempoPace = parseInt(r.tempo_para_pace, 10);
+                const distPace = parseInt(r.distancia_para_pace, 10);
+                const paceMedio = distPace > 0 ? Math.round((tempoPace / distPace) * 1000) : null;
+
+                return {
+                    data: r.data,
+                    sessao_id: r.sessao_id,
+                    tipo_exercicio: tipoExercicio,
+                    maior_carga: r.maior_carga !== null ? Math.round(parseFloat(r.maior_carga) * 100) / 100 : null,
+                    media_repeticoes: r.media_repeticoes !== null ? Math.round(parseFloat(r.media_repeticoes) * 10) / 10 : null,
+                    volume_total: Math.round(parseFloat(r.volume_total) * 100) / 100,
+                    melhor_tempo_segundos: r.melhor_tempo !== null ? parseInt(r.melhor_tempo, 10) : null,
+                    media_tempo_segundos: r.media_tempo !== null ? Math.round(parseFloat(r.media_tempo)) : null,
+                    tempo_total_segundos: parseInt(r.tempo_total, 10),
+                    maior_distancia_metros: r.maior_distancia !== null ? parseInt(r.maior_distancia, 10) : null,
+                    media_distancia_metros: r.media_distancia !== null ? Math.round(parseFloat(r.media_distancia)) : null,
+                    distancia_total_metros: parseInt(r.distancia_total, 10),
+                    melhor_pace_segundos_por_km: r.melhor_pace !== null ? Math.round(parseFloat(r.melhor_pace)) : null,
+                    pace_medio_segundos_por_km: paceMedio,
+                };
+            });
         } catch (error) {
             throw parseDatabaseError(error, 'HistoricoRepository.getProgressao');
+        }
+    }
+
+    async getRecordeExercicio(alunoId: string, exercicioId: string): Promise<RecordeExercicio | null> {
+        try {
+            const [exRow] = await this.db
+                .select({ id: exercicio.id, nome: exercicio.nome, tipo: exercicio.tipo_exercicio })
+                .from(exercicio)
+                .where(eq(exercicio.id, exercicioId))
+                .limit(1);
+
+            if (!exRow) return null;
+
+            const series = await this.db
+                .select({
+                    sessao_id: sessao_treino.id,
+                    data: sessao_treino.inicio,
+                    repeticoes_realizadas: sessao_serie.repeticoes_realizadas,
+                    carga_utilizada: sessao_serie.carga_utilizada,
+                    tempo_realizado_segundos: sessao_serie.tempo_realizado_segundos,
+                    distancia_realizada_metros: sessao_serie.distancia_realizada_metros,
+                })
+                .from(sessao_treino)
+                .innerJoin(sessao_exercicio, eq(sessao_exercicio.sessao_treino_id, sessao_treino.id))
+                .innerJoin(treino_exercicio, eq(sessao_exercicio.treino_exercicio_id, treino_exercicio.id))
+                .innerJoin(sessao_serie, eq(sessao_serie.sessao_exercicio_id, sessao_exercicio.id))
+                .where(
+                    and(
+                        eq(sessao_treino.aluno_id, alunoId),
+                        eq(treino_exercicio.exercicio_id, exercicioId),
+                        eq(sessao_treino.status, 'CONCLUIDA'),
+                        eq(sessao_serie.status, 'CONCLUIDA'),
+                    ),
+                );
+
+            const sessoesUnicas = new Set(series.map((s) => s.sessao_id)).size;
+
+            let maior_carga_kg: number | null = null;
+            let repeticoes_no_pr: number | null = null;
+            let data_pr_carga: Date | null = null;
+            let melhor_tempo_segundos: number | null = null;
+            let data_pr_tempo: Date | null = null;
+            let maior_distancia_metros: number | null = null;
+            let data_pr_distancia: Date | null = null;
+            let melhor_pace_segundos_por_km: number | null = null;
+            let data_pr_pace: Date | null = null;
+
+            for (const s of series) {
+                if (s.carga_utilizada !== null) {
+                    const carga = parseFloat(s.carga_utilizada);
+                    if (maior_carga_kg === null || carga > maior_carga_kg) {
+                        maior_carga_kg = carga;
+                        repeticoes_no_pr = s.repeticoes_realizadas;
+                        data_pr_carga = s.data;
+                    }
+                }
+                if (s.tempo_realizado_segundos !== null && s.distancia_realizada_metros === null) {
+                    if (melhor_tempo_segundos === null || s.tempo_realizado_segundos > melhor_tempo_segundos) {
+                        melhor_tempo_segundos = s.tempo_realizado_segundos;
+                        data_pr_tempo = s.data;
+                    }
+                }
+                if (s.distancia_realizada_metros !== null) {
+                    if (maior_distancia_metros === null || s.distancia_realizada_metros > maior_distancia_metros) {
+                        maior_distancia_metros = s.distancia_realizada_metros;
+                        data_pr_distancia = s.data;
+                    }
+                    if (s.tempo_realizado_segundos !== null && s.distancia_realizada_metros > 0) {
+                        const pace = Math.round((s.tempo_realizado_segundos / s.distancia_realizada_metros) * 1000);
+                        if (melhor_pace_segundos_por_km === null || pace < melhor_pace_segundos_por_km) {
+                            melhor_pace_segundos_por_km = pace;
+                            data_pr_pace = s.data;
+                        }
+                    }
+                }
+            }
+
+            return {
+                exercicio_id: exRow.id,
+                nome: exRow.nome,
+                tipo_exercicio: exRow.tipo,
+                total_sessoes: sessoesUnicas,
+                maior_carga_kg: maior_carga_kg !== null ? Math.round(maior_carga_kg * 100) / 100 : null,
+                repeticoes_no_pr,
+                data_pr_carga,
+                melhor_tempo_segundos,
+                data_pr_tempo,
+                maior_distancia_metros,
+                data_pr_distancia,
+                melhor_pace_segundos_por_km,
+                data_pr_pace,
+            };
+        } catch (error) {
+            throw parseDatabaseError(error, 'HistoricoRepository.getRecordeExercicio');
         }
     }
 
@@ -246,6 +457,12 @@ class HistoricoRepository {
                             else 0
                         end
                     ), 0)`,
+                    tempo_total_segundos: sql<string>`coalesce(sum(
+                        case when ${exercicio.tipo_exercicio} = 'TEMPO' then ${sessao_serie.tempo_realizado_segundos} else 0 end
+                    ), 0)`,
+                    distancia_total_metros: sql<string>`coalesce(sum(
+                        case when ${exercicio.tipo_exercicio} = 'DISTANCIA' then ${sessao_serie.distancia_realizada_metros} else 0 end
+                    ), 0)`,
                 })
                 .from(sessao_treino)
                 .innerJoin(sessao_exercicio, eq(sessao_exercicio.sessao_treino_id, sessao_treino.id))
@@ -272,6 +489,8 @@ class HistoricoRepository {
                 grupo_muscular: r.grupo_muscular,
                 total_series: Number(r.total_series),
                 volume_total_kg: Math.round(parseFloat(r.volume_total_kg) * 100) / 100,
+                tempo_total_segundos: parseInt(r.tempo_total_segundos, 10),
+                distancia_total_metros: parseInt(r.distancia_total_metros, 10),
                 percentual: totalSeries > 0 ? Math.round((Number(r.total_series) / totalSeries) * 1000) / 10 : 0,
             }));
         } catch (error) {
@@ -284,12 +503,14 @@ class HistoricoRepository {
         dataInicio?: string,
         dataFim?: string,
         limite: number = 10,
+        tipoExercicio?: 'REPETICAO' | 'TEMPO' | 'DISTANCIA',
     ): Promise<ExercicioFrequenteItem[]> {
         try {
             const rows = await this.db
                 .select({
                     exercicio_id: exercicio.id,
                     nome: exercicio.nome,
+                    tipo_exercicio: exercicio.tipo_exercicio,
                     total_sessoes: sql<string>`count(distinct ${sessao_treino.id})`,
                     total_series: sql<string>`count(${sessao_serie.id})`,
                     volume_total_kg: sql<string>`coalesce(sum(
@@ -300,6 +521,8 @@ class HistoricoRepository {
                             else 0
                         end
                     ), 0)`,
+                    tempo_total_segundos: sql<string>`coalesce(sum(${sessao_serie.tempo_realizado_segundos}), 0)`,
+                    distancia_total_metros: sql<string>`coalesce(sum(${sessao_serie.distancia_realizada_metros}), 0)`,
                 })
                 .from(sessao_treino)
                 .innerJoin(sessao_exercicio, eq(sessao_exercicio.sessao_treino_id, sessao_treino.id))
@@ -313,18 +536,22 @@ class HistoricoRepository {
                         eq(sessao_serie.status, 'CONCLUIDA'),
                         dataInicio ? gte(sessao_treino.inicio, new Date(dataInicio)) : undefined,
                         dataFim ? lte(sessao_treino.inicio, new Date(dataFim)) : undefined,
+                        tipoExercicio ? eq(exercicio.tipo_exercicio, tipoExercicio) : undefined,
                     ),
                 )
-                .groupBy(exercicio.id, exercicio.nome)
+                .groupBy(exercicio.id, exercicio.nome, exercicio.tipo_exercicio)
                 .orderBy(desc(sql`count(distinct ${sessao_treino.id})`), asc(exercicio.nome))
                 .limit(limite);
 
             return rows.map((r) => ({
                 exercicio_id: r.exercicio_id,
                 nome: r.nome,
+                tipo_exercicio: r.tipo_exercicio,
                 total_sessoes: Number(r.total_sessoes),
                 total_series: Number(r.total_series),
                 volume_total_kg: Math.round(parseFloat(r.volume_total_kg) * 100) / 100,
+                tempo_total_segundos: parseInt(r.tempo_total_segundos, 10),
+                distancia_total_metros: parseInt(r.distancia_total_metros, 10),
             }));
         } catch (error) {
             throw parseDatabaseError(error, 'HistoricoRepository.getExerciciosFrequentes');

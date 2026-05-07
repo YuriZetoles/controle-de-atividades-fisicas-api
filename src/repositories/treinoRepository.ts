@@ -12,6 +12,7 @@ import {
 } from '../config/db/schema';
 import { and, asc, desc, eq, inArray, isNull, sql } from 'drizzle-orm';
 import { type_treino } from '../types/dbSchemas';
+import { enum_tipo_exercicio } from '../types/enum';
 import { parseDatabaseError } from '../utils/errors/DatabaseError';
 import TreinoFilterBuilder from './filters/TreinoFilterBuilder';
 import { TreinoDetalheQuery, TreinoListQuery } from '../utils/validations/treinoValidation';
@@ -19,14 +20,17 @@ import { TreinoDetalheQuery, TreinoListQuery } from '../utils/validations/treino
 export interface TreinoExercicioDetalhe {
     id: string;
     series: number;
-    repeticoes: string;
+    repeticoes: string | null;
     carga_sugerida: string | null;
+    duracao_sugerida_segundos: number | null;
+    distancia_sugerida_metros: number | null;
     tempo_descanso_segundos: number;
     ordem_execucao: number;
     exercicio: {
         id: string;
         nome: string;
         descricao: string | null;
+        tipo_exercicio: enum_tipo_exercicio;
         musculos?: {
             musculo_id: string;
             nome: string;
@@ -56,8 +60,10 @@ export interface ResultadoPaginadoTreino {
 export interface TreinoExercicioPatchInput {
     exercicio_id: string;
     series: number;
-    repeticoes: string;
+    repeticoes?: string | null;
     carga_sugerida?: number | null;
+    duracao_sugerida_segundos?: number | null;
+    distancia_sugerida_metros?: number | null;
     tempo_descanso_segundos: number;
     ordem_execucao: number;
 }
@@ -65,8 +71,10 @@ export interface TreinoExercicioPatchInput {
 export interface TreinoExercicioUpdateInput {
     id: string;
     series?: number;
-    repeticoes?: string;
+    repeticoes?: string | null;
     carga_sugerida?: number | null;
+    duracao_sugerida_segundos?: number | null;
+    distancia_sugerida_metros?: number | null;
     tempo_descanso_segundos?: number;
     ordem_execucao?: number;
 }
@@ -75,6 +83,7 @@ export interface ExercicioResumo {
     id: string;
     aluno_id: string | null;
     deletado_em: Date | null;
+    tipo_exercicio: enum_tipo_exercicio;
 }
 
 class TreinoRepository {
@@ -115,8 +124,10 @@ class TreinoRepository {
                         treino_id: treinoInserido.id,
                         exercicio_id: item.exercicio_id,
                         series: item.series,
-                        repeticoes: item.repeticoes,
+                        repeticoes: item.repeticoes ?? null,
                         carga_sugerida: this.formatCargaSugerida(item.carga_sugerida),
+                        duracao_sugerida_segundos: item.duracao_sugerida_segundos ?? null,
+                        distancia_sugerida_metros: item.distancia_sugerida_metros ?? null,
                         tempo_descanso_segundos: item.tempo_descanso_segundos,
                         ordem_execucao: item.ordem_execucao,
                     })),
@@ -195,11 +206,14 @@ class TreinoRepository {
                 series: treino_exercicio.series,
                 repeticoes: treino_exercicio.repeticoes,
                 carga_sugerida: treino_exercicio.carga_sugerida,
+                duracao_sugerida_segundos: treino_exercicio.duracao_sugerida_segundos,
+                distancia_sugerida_metros: treino_exercicio.distancia_sugerida_metros,
                 tempo_descanso_segundos: treino_exercicio.tempo_descanso_segundos,
                 ordem_execucao: treino_exercicio.ordem_execucao,
                 exercicio_id: exercicio.id,
                 exercicio_nome: exercicio.nome,
                 exercicio_descricao: exercicio.descricao,
+                exercicio_tipo: exercicio.tipo_exercicio,
             })
             .from(treino_exercicio)
             .innerJoin(exercicio, eq(treino_exercicio.exercicio_id, exercicio.id))
@@ -275,12 +289,15 @@ class TreinoRepository {
             series: item.series,
             repeticoes: item.repeticoes,
             carga_sugerida: item.carga_sugerida,
+            duracao_sugerida_segundos: item.duracao_sugerida_segundos,
+            distancia_sugerida_metros: item.distancia_sugerida_metros,
             tempo_descanso_segundos: item.tempo_descanso_segundos,
             ordem_execucao: item.ordem_execucao,
             exercicio: {
                 id: item.exercicio_id,
                 nome: item.exercicio_nome,
                 descricao: item.exercicio_descricao,
+                tipo_exercicio: item.exercicio_tipo,
                 ...(filtros.incluir_musculos
                     ? { musculos: musculosPorExercicio.get(item.exercicio_id) ?? [] }
                     : {}),
@@ -440,6 +457,7 @@ class TreinoRepository {
                     id: exercicio.id,
                     aluno_id: exercicio.aluno_id,
                     deletado_em: exercicio.deletado_em,
+                    tipo_exercicio: exercicio.tipo_exercicio,
                 })
                 .from(exercicio)
                 .where(inArray(exercicio.id, ids));
@@ -481,8 +499,10 @@ class TreinoRepository {
                     treino_id: treinoId,
                     exercicio_id: item.exercicio_id,
                     series: item.series,
-                    repeticoes: item.repeticoes,
+                    repeticoes: item.repeticoes ?? null,
                     carga_sugerida: this.formatCargaSugerida(item.carga_sugerida),
+                    duracao_sugerida_segundos: item.duracao_sugerida_segundos ?? null,
+                    distancia_sugerida_metros: item.distancia_sugerida_metros ?? null,
                     tempo_descanso_segundos: item.tempo_descanso_segundos,
                     ordem_execucao: item.ordem_execucao,
                 })),
@@ -502,8 +522,10 @@ class TreinoRepository {
                 for (const item of atualizacoes) {
                     const payload: Partial<{
                         series: number;
-                        repeticoes: string;
+                        repeticoes: string | null;
                         carga_sugerida: string | null;
+                        duracao_sugerida_segundos: number | null;
+                        distancia_sugerida_metros: number | null;
                         tempo_descanso_segundos: number;
                         ordem_execucao: number;
                     }> = {};
@@ -513,6 +535,8 @@ class TreinoRepository {
                     if (item.carga_sugerida !== undefined) {
                         payload.carga_sugerida = this.formatCargaSugerida(item.carga_sugerida);
                     }
+                    if (item.duracao_sugerida_segundos !== undefined) payload.duracao_sugerida_segundos = item.duracao_sugerida_segundos;
+                    if (item.distancia_sugerida_metros !== undefined) payload.distancia_sugerida_metros = item.distancia_sugerida_metros;
                     if (item.tempo_descanso_segundos !== undefined) payload.tempo_descanso_segundos = item.tempo_descanso_segundos;
                     if (item.ordem_execucao !== undefined) payload.ordem_execucao = item.ordem_execucao;
 
