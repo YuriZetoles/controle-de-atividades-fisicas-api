@@ -37,6 +37,7 @@ export interface FiltrosExercicio {
     nome?: string;
     grupo_muscular?: string;
     tipo_ativacao?: string;
+    tipo_exercicio?: 'REPETICAO' | 'TEMPO' | 'DISTANCIA';
     aluno_id?: string;
     escopo?: 'GLOBAL' | 'PESSOAL' | 'TODOS';
     em_uso?: boolean;

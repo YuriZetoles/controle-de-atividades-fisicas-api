@@ -1,4 +1,4 @@
-import { enum_dia_semana, enum_remetente_tipo, enum_sexo, enum_status_serie, enum_status_sessao, enum_turnos } from "./enum";
+import { enum_dia_semana, enum_remetente_tipo, enum_sexo, enum_status_serie, enum_status_sessao, enum_tipo_exercicio, enum_turnos } from "./enum";
 
 export type type_academia = {
     id?: string;
@@ -91,6 +91,7 @@ export type type_exercicio = {
     descricao?: string | null;
     animacao_url?: string | null;
     aluno_id?: string | null;
+    tipo_exercicio?: enum_tipo_exercicio;
     deletado_em?: Date | null;
     created_at?: Date;
 }
@@ -123,8 +124,10 @@ export type type_treino = {
 export type type_treino_exercicio = {
     id?: string;
     series: number;
-    repeticoes: string;
-    carga_sugerida: number;
+    repeticoes?: string | null;
+    carga_sugerida?: number | null;
+    duracao_sugerida_segundos?: number | null;
+    distancia_sugerida_metros?: number | null;
     tempo_descanso_segundos: number;
     ordem_execucao: number;
     treino_id: string;
@@ -158,6 +161,8 @@ export type type_sessao_serie = {
     numero_serie: number;
     repeticoes_realizadas?: number | null;
     carga_utilizada?: string | null;
+    tempo_realizado_segundos?: number | null;
+    distancia_realizada_metros?: number | null;
     status?: enum_status_serie;
     observacoes?: string | null;
 }

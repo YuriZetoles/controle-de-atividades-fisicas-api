@@ -8,6 +8,7 @@ export const turnoEnum = pgEnum('turno', ['MANHA', 'TARDE', 'NOITE']);
 export const grupoMuscularEnum = pgEnum('grupo_muscular', ['PEITO', 'COSTAS', 'PERNAS', 'BRAÇOS', 'OMBROS', 'ABDOMEN', 'PESCOÇO', 'CARDIO']);
 export const diaSemanaEnum = pgEnum('dia_semana', ['SEGUNDA', 'TERCA', 'QUARTA', 'QUINTA', 'SEXTA', 'SABADO', 'DOMINGO']);
 export const remetenteTipoEnum = pgEnum('remetente_tipo', ['ALUNO', 'TREINADOR']);
+export const tipoExercicioEnum = pgEnum('tipo_exercicio', ['REPETICAO', 'TEMPO', 'DISTANCIA']);
 
 // Tabelas do BetterAuth (autenticação)
 export const user = pgTable('user', {
@@ -186,6 +187,7 @@ export const exercicio = pgTable('exercicio', {
     descricao: text('descricao'),
     animacao_url: varchar('animacao_url', { length: 255 }),
     aluno_id: uuid('aluno_id').references(() => aluno.id),
+    tipo_exercicio: tipoExercicioEnum('tipo_exercicio').notNull().default('REPETICAO'),
     deletado_em: timestamp('deletado_em'),
     created_at: timestamp('created_at').defaultNow().notNull(),
 });
@@ -220,8 +222,10 @@ export const treino = pgTable('treino', {
 export const treino_exercicio = pgTable('treino_exercicio', {
     id: uuid('id').defaultRandom().primaryKey(),
     series: integer('series').notNull(),
-    repeticoes: varchar('repeticoes', { length: 50 }).notNull(),
+    repeticoes: varchar('repeticoes', { length: 50 }),
     carga_sugerida: decimal('carga_sugerida', { precision: 5, scale: 2 }),
+    duracao_sugerida_segundos: integer('duracao_sugerida_segundos'),
+    distancia_sugerida_metros: integer('distancia_sugerida_metros'),
     tempo_descanso_segundos: integer('tempo_descanso_segundos').notNull(),
     ordem_execucao: integer('ordem_execucao').notNull(),
     treino_id: uuid('treino_id').notNull().references(() => treino.id, { onDelete: 'cascade' }),
@@ -438,6 +442,8 @@ export const sessao_serie = pgTable('sessao_serie', {
     numero_serie: integer('numero_serie').notNull(),
     repeticoes_realizadas: integer('repeticoes_realizadas'),
     carga_utilizada: decimal('carga_utilizada', { precision: 5, scale: 2 }),
+    tempo_realizado_segundos: integer('tempo_realizado_segundos'),
+    distancia_realizada_metros: integer('distancia_realizada_metros'),
     status: statusSerieEnum('status').notNull().default('PENDENTE'),
     observacoes: text('observacoes'),
 });
