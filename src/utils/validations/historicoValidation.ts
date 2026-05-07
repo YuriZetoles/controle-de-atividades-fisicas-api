@@ -90,7 +90,21 @@ const historicoExerciciosFrequentesQuerySchema = z.object({
         .transform((val) => (val ? parseInt(val, 10) : 10))
         .refine((val) => Number.isInteger(val) && val > 0 && val <= 50, { message: 'limite deve ser entre 1 e 50' })
         .openapi({ description: 'Máximo de exercícios retornados (padrão: 10, máx: 50)', example: '10' }),
+    tipo_exercicio: z
+        .enum(['REPETICAO', 'TEMPO', 'DISTANCIA'])
+        .optional()
+        .openapi({ description: 'Filtra apenas exercícios deste tipo de medição', example: 'TEMPO' }),
 }).strict().openapi('HistoricoExerciciosFrequentesQuery');
+
+const historicoRecordeQuerySchema = z.object({
+    aluno_id: z
+        .string()
+        .uuid({ message: 'aluno_id deve ser um UUID válido' })
+        .optional()
+        .openapi({ description: 'Filtra por aluno (obrigatório para admin e treinador)', example: '550e8400-e29b-41d4-a716-446655440001' }),
+}).strict().openapi('HistoricoRecordeQuery');
+
+type HistoricoRecordeQuery = z.infer<typeof historicoRecordeQuerySchema>;
 
 const historicoComparativoQuerySchema = z.object({
     aluno_id: z
@@ -118,6 +132,7 @@ export {
     historicoExercicioIdSchema,
     historicoGruposMuscularesQuerySchema,
     historicoExerciciosFrequentesQuerySchema,
+    historicoRecordeQuerySchema,
     historicoComparativoQuerySchema,
 };
 export type {
@@ -125,5 +140,6 @@ export type {
     HistoricoProgressaoQuery,
     HistoricoGruposMuscularesQuery,
     HistoricoExerciciosFrequentesQuery,
+    HistoricoRecordeQuery,
     HistoricoComparativoQuery,
 };

@@ -115,6 +115,22 @@ const serieItemSchema = z.object({
         .nullable()
         .optional()
         .openapi({ description: "Carga utilizada em kg (decimal)", example: "80.50" }),
+    tempo_realizado_segundos: z
+        .number({ message: 'tempo_realizado_segundos deve ser um número inteiro positivo' })
+        .int({ message: 'tempo_realizado_segundos deve ser um número inteiro' })
+        .min(1, { message: 'tempo_realizado_segundos deve ser maior que 0' })
+        .max(7200, { message: 'tempo_realizado_segundos deve ser no máximo 7200 (2h)' })
+        .nullable()
+        .optional()
+        .openapi({ description: "Tempo realizado em segundos (obrigatório para exercícios tipo TEMPO; opcional para DISTANCIA)", example: 47 }),
+    distancia_realizada_metros: z
+        .number({ message: 'distancia_realizada_metros deve ser um número inteiro positivo' })
+        .int({ message: 'distancia_realizada_metros deve ser um número inteiro' })
+        .min(1, { message: 'distancia_realizada_metros deve ser maior que 0' })
+        .max(200000, { message: 'distancia_realizada_metros deve ser no máximo 200000 (200km)' })
+        .nullable()
+        .optional()
+        .openapi({ description: "Distância realizada em metros (obrigatório para exercícios tipo DISTANCIA)", example: 5000 }),
     status: z
         .enum(['PENDENTE', 'CONCLUIDA', 'PULADA'], { message: 'status deve ser PENDENTE, CONCLUIDA ou PULADA' })
         .openapi({ description: "Status da série", example: "CONCLUIDA" }),
