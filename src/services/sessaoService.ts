@@ -274,6 +274,51 @@ class SessaoService {
         }
     }
 
+    private validarSerieRealizadaPorTipo(
+        serie: {
+            numero_serie: number;
+            repeticoes_realizadas?: number | null;
+            tempo_realizado_segundos?: number | null;
+            distancia_realizada_metros?: number | null;
+            status: 'PENDENTE' | 'CONCLUIDA' | 'PULADA';
+        },
+        tipo: 'REPETICAO' | 'TEMPO' | 'DISTANCIA',
+    ): void {
+        const repsPreenchido = serie.repeticoes_realizadas !== undefined && serie.repeticoes_realizadas !== null;
+        const tempoPreenchido = serie.tempo_realizado_segundos !== undefined && serie.tempo_realizado_segundos !== null;
+        const distanciaPreenchida = serie.distancia_realizada_metros !== undefined && serie.distancia_realizada_metros !== null;
+        const ctx = `série ${serie.numero_serie}:`;
+
+        if (tipo === 'REPETICAO') {
+            if (tempoPreenchido) {
+                throw new Error(`VALIDATION: ${ctx} tempo_realizado_segundos não se aplica a exercícios tipo REPETICAO`);
+            }
+            if (distanciaPreenchida) {
+                throw new Error(`VALIDATION: ${ctx} distancia_realizada_metros não se aplica a exercícios tipo REPETICAO`);
+            }
+            if (serie.status === 'CONCLUIDA' && !repsPreenchido) {
+                throw new Error(`VALIDATION: ${ctx} repeticoes_realizadas é obrigatório para série CONCLUIDA tipo REPETICAO`);
+            }
+        } else if (tipo === 'TEMPO') {
+            if (repsPreenchido) {
+                throw new Error(`VALIDATION: ${ctx} repeticoes_realizadas não se aplica a exercícios tipo TEMPO`);
+            }
+            if (distanciaPreenchida) {
+                throw new Error(`VALIDATION: ${ctx} distancia_realizada_metros não se aplica a exercícios tipo TEMPO`);
+            }
+            if (serie.status === 'CONCLUIDA' && !tempoPreenchido) {
+                throw new Error(`VALIDATION: ${ctx} tempo_realizado_segundos é obrigatório para série CONCLUIDA tipo TEMPO`);
+            }
+        } else if (tipo === 'DISTANCIA') {
+            if (repsPreenchido) {
+                throw new Error(`VALIDATION: ${ctx} repeticoes_realizadas não se aplica a exercícios tipo DISTANCIA`);
+            }
+            if (serie.status === 'CONCLUIDA' && !distanciaPreenchida) {
+                throw new Error(`VALIDATION: ${ctx} distancia_realizada_metros é obrigatório para série CONCLUIDA tipo DISTANCIA`);
+            }
+        }
+    }
+
     async updateSeriesExercicio(
         idParam: string,
         exercicioIdParam: string,
@@ -300,6 +345,10 @@ class SessaoService {
             throw new Error('Exercício não encontrado nesta sessão');
         }
 
+        for (const serie of dados.series) {
+            this.validarSerieRealizadaPorTipo(serie, sessaoExercicio.tipo_exercicio);
+        }
+
         const exercicioInicioInfo = await this.repository.findSessaoExercicioInicio(exercicioId);
         if (exercicioInicioInfo && exercicioInicioInfo.inicio === null) {
             await this.repository.updateSessaoExercicio(exercicioId, { concluido: false, inicio: new Date() });
@@ -318,6 +367,9 @@ class SessaoService {
             series_concluidas: number;
             series_total: number;
             volume_total_kg: number;
+            tempo_total_isometria_segundos: number;
+            distancia_total_metros: number;
+            pace_medio_segundos_por_km: number | null;
             taxa_conclusao: number;
         };
     }> {
@@ -404,6 +456,9 @@ class SessaoService {
         series_concluidas: number;
         series_total: number;
         volume_total_kg: number;
+        tempo_total_isometria_segundos: number;
+        distancia_total_metros: number;
+        pace_medio_segundos_por_km: number | null;
         taxa_conclusao: number;
     }> {
         const id = sessaoIdSchema.parse(idParam);

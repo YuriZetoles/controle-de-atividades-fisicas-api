@@ -51,6 +51,29 @@ export interface SyncCompletoResult {
 
 // Mapas de tradução
 
+// Palavras-chave que sinalizam exercício isométrico (medido por TEMPO)
+const TEMPO_KEYWORDS = [
+    'plank', 'prancha', 'hold', 'isometric', 'isometric',
+    'wall sit', 'wall-sit', 'l-sit', 'l sit', 'dead hang', 'dead-hang',
+    'hollow hold', 'flag hold', 'static', 'sustentação', 'isometria',
+];
+
+function inferirTipoExercicio(item: ExerciseDbItem): 'REPETICAO' | 'TEMPO' | 'DISTANCIA' {
+    const nomeLower = item.name.toLowerCase();
+    const bodyPartLower = item.bodyPart.toLowerCase().trim();
+    const targetLower = item.target.toLowerCase().trim();
+
+    if (bodyPartLower === 'cardio' || targetLower === 'cardiovascular system') {
+        return 'DISTANCIA';
+    }
+
+    if (TEMPO_KEYWORDS.some((kw) => nomeLower.includes(kw))) {
+        return 'TEMPO';
+    }
+
+    return 'REPETICAO';
+}
+
 // bodyPart da ExerciseDB → nosso enum grupo_muscular
 const BODY_PART_TO_GRUPO: Record<string, type_grupo_muscular> = {
     'chest': 'PEITO',
@@ -533,6 +556,8 @@ class ExerciseDbService {
                     }
                 }
 
+                const tipoInferido = inferirTipoExercicio(item);
+
                 await DataBase.transaction(async (tx) => {
                     const [exercicioCriado] = await tx
                         .insert(exercicio)
@@ -541,6 +566,7 @@ class ExerciseDbService {
                             descricao,
                             animacao_url: animacaoUrl,
                             aluno_id: null,
+                            tipo_exercicio: tipoInferido,
                         })
                         .returning();
 

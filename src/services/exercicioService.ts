@@ -92,6 +92,7 @@ class ExercicioService {
                 descricao: dadosValidados.descricao ?? null,
                 animacao_url: dadosValidados.animacao_url ?? null,
                 aluno_id: alunoId ?? null,
+                tipo_exercicio: dadosValidados.tipo_exercicio ?? 'REPETICAO',
             };
 
             const exercicioCriado = await this.repository.createExercicio(
@@ -117,6 +118,7 @@ class ExercicioService {
                 nome,
                 grupo_muscular,
                 tipo_ativacao,
+                tipo_exercicio,
                 aluno_id,
                 escopo,
                 em_uso,
@@ -166,6 +168,7 @@ class ExercicioService {
             if (nome) filtros.nome = nome;
             if (grupo_muscular) filtros.grupo_muscular = grupo_muscular;
             if (tipo_ativacao) filtros.tipo_ativacao = tipo_ativacao;
+            if (tipo_exercicio) filtros.tipo_exercicio = tipo_exercicio;
             if (alunoContexto) filtros.aluno_id = alunoContexto;
             if (escopoFinal) filtros.escopo = escopoFinal;
             if (typeof em_uso === 'boolean') filtros.em_uso = em_uso;
@@ -268,11 +271,24 @@ class ExercicioService {
                 }
             }
 
+            if (
+                dadosValidados.tipo_exercicio !== undefined &&
+                dadosValidados.tipo_exercicio !== exercicioExistente.tipo_exercicio
+            ) {
+                const referencias = await this.repository.contarReferenciasEmRotina(id);
+                if (referencias > 0) {
+                    throw new Error(
+                        `CONFLICT: não é possível alterar tipo_exercicio — exercício está vinculado a ${referencias} treino(s). Remova-o dos treinos antes ou crie um novo exercício com o tipo desejado.`,
+                    );
+                }
+            }
+
             const { musculos, aparelhos, ...camposExercicio } = dadosValidados;
             const dadosParaAtualizar: Partial<type_exercicio> = {};
             if (camposExercicio.nome !== undefined) dadosParaAtualizar.nome = camposExercicio.nome;
             if (camposExercicio.descricao !== undefined) dadosParaAtualizar.descricao = camposExercicio.descricao;
             if (camposExercicio.animacao_url !== undefined) dadosParaAtualizar.animacao_url = camposExercicio.animacao_url;
+            if (camposExercicio.tipo_exercicio !== undefined) dadosParaAtualizar.tipo_exercicio = camposExercicio.tipo_exercicio;
 
             await this.repository.updateExercicio(id, dadosParaAtualizar, musculos, aparelhos);
 

@@ -25,6 +25,48 @@ class TreinoService {
         this.usuarioRepository = new UsuarioRepository();
     }
 
+    private validarCamposPorTipo(
+        item: { repeticoes?: string | null; duracao_sugerida_segundos?: number | null; distancia_sugerida_metros?: number | null },
+        tipo: 'REPETICAO' | 'TEMPO' | 'DISTANCIA',
+        contexto: string,
+    ): void {
+        const repeticoesPreenchido = item.repeticoes !== undefined && item.repeticoes !== null && item.repeticoes !== '';
+        const duracaoPreenchida = item.duracao_sugerida_segundos !== undefined && item.duracao_sugerida_segundos !== null;
+        const distanciaPreenchida = item.distancia_sugerida_metros !== undefined && item.distancia_sugerida_metros !== null;
+
+        if (tipo === 'REPETICAO') {
+            if (!repeticoesPreenchido) {
+                throw new Error(`VALIDATION: ${contexto} repeticoes é obrigatório para exercícios tipo REPETICAO`);
+            }
+            if (duracaoPreenchida) {
+                throw new Error(`VALIDATION: ${contexto} duracao_sugerida_segundos não se aplica a exercícios tipo REPETICAO`);
+            }
+            if (distanciaPreenchida) {
+                throw new Error(`VALIDATION: ${contexto} distancia_sugerida_metros não se aplica a exercícios tipo REPETICAO`);
+            }
+        } else if (tipo === 'TEMPO') {
+            if (!duracaoPreenchida) {
+                throw new Error(`VALIDATION: ${contexto} duracao_sugerida_segundos é obrigatório para exercícios tipo TEMPO`);
+            }
+            if (repeticoesPreenchido) {
+                throw new Error(`VALIDATION: ${contexto} repeticoes não se aplica a exercícios tipo TEMPO`);
+            }
+            if (distanciaPreenchida) {
+                throw new Error(`VALIDATION: ${contexto} distancia_sugerida_metros não se aplica a exercícios tipo TEMPO`);
+            }
+        } else if (tipo === 'DISTANCIA') {
+            if (!distanciaPreenchida) {
+                throw new Error(`VALIDATION: ${contexto} distancia_sugerida_metros é obrigatório para exercícios tipo DISTANCIA`);
+            }
+            if (repeticoesPreenchido) {
+                throw new Error(`VALIDATION: ${contexto} repeticoes não se aplica a exercícios tipo DISTANCIA`);
+            }
+            if (duracaoPreenchida) {
+                throw new Error(`VALIDATION: ${contexto} duracao_sugerida_segundos não se aplica a exercícios tipo DISTANCIA`);
+            }
+        }
+    }
+
     private async validarExerciciosParaVinculo(
         itens: TreinoExercicioPatchInput[],
         perfil: Awaited<ReturnType<UsuarioRepository['buscarPerfilAcesso']>>,
@@ -44,6 +86,14 @@ class TreinoService {
         const exerciciosInvalidos = exerciciosEncontrados.filter((item) => item.deletado_em !== null);
         if (exerciciosInvalidos.length > 0) {
             throw new Error('VALIDATION: não é permitido adicionar exercício inativo ao treino');
+        }
+
+        const tipoPorExercicioId = new Map(exerciciosEncontrados.map((e) => [e.id, e.tipo_exercicio]));
+        for (const item of itens) {
+            const tipo = tipoPorExercicioId.get(item.exercicio_id);
+            if (tipo) {
+                this.validarCamposPorTipo(item, tipo, `exercicio_id ${item.exercicio_id}:`);
+            }
         }
 
         const exerciciosSemPermissao = exerciciosEncontrados.filter((item) => {
@@ -351,6 +401,16 @@ class TreinoService {
                 throw new Error(
                     'VALIDATION: um ou mais itens de atualizar_exercicios não pertencem a este treino ou estão sendo removidos',
                 );
+            }
+
+            for (const update of atualizarExercicios) {
+                const existente = idsItemDoTreino.get(update.id)!;
+                const merged = {
+                    repeticoes: update.repeticoes !== undefined ? update.repeticoes : existente.repeticoes,
+                    duracao_sugerida_segundos: update.duracao_sugerida_segundos !== undefined ? update.duracao_sugerida_segundos : existente.duracao_sugerida_segundos,
+                    distancia_sugerida_metros: update.distancia_sugerida_metros !== undefined ? update.distancia_sugerida_metros : existente.distancia_sugerida_metros,
+                };
+                this.validarCamposPorTipo(merged, existente.exercicio.tipo_exercicio, `atualizar_exercicios id ${update.id}:`);
             }
 
             const idsAtualizando = new Set(atualizarExercicios.map((item) => item.id));
