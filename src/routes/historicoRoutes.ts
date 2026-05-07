@@ -20,4 +20,7 @@ router.get('/historico/exercicios-frequentes', authMiddleware, historicoControll
 // GET /historico/comparativo — período atual vs período anterior
 router.get('/historico/comparativo', authMiddleware, historicoController.getComparativo);
 
+// GET /historico/recordes/:exercicioId — recorde pessoal (PR) por exercício
+router.get('/historico/recordes/:exercicioId', authMiddleware, historicoController.getRecordeExercicio);
+
 export default router;

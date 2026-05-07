@@ -209,6 +209,9 @@ class ExercicioController {
                 if (error.message === 'Já existe um exercício com este nome') {
                     return CommonResponse.error(res, HttpStatusCode.CONFLICT.code, null, 'nome', [], error.message);
                 }
+                if (error.message.startsWith('CONFLICT:')) {
+                    return CommonResponse.error(res, HttpStatusCode.CONFLICT.code, null, null, [], error.message.replace('CONFLICT: ', ''));
+                }
                 if (
                     error.message.startsWith('Músculo(s) não encontrado(s)') ||
                     error.message.startsWith('Aparelho(s) não encontrado(s)')
