@@ -656,6 +656,50 @@ describe('POST /exercicios', () => {
         const res = await request(app).post('/api/exercicios').send(buildPayloadGlobal(`Token Invalido ${RUN_ID}`));
         expect(res.status).toBe(401);
     });
+
+    // ── tipo_exercicio ────────────────────────────────────────────
+
+    it('admin cria exercício sem tipo_exercicio → 201 com default REPETICAO', async () => {
+        asAdmin();
+        const res = await request(app)
+            .post('/api/exercicios')
+            .send(buildPayloadGlobal(`Tipo Default ${RUN_ID}`));
+
+        expect(res.status).toBe(201);
+        expect(res.body.data.tipo_exercicio).toBe('REPETICAO');
+        if (res.body.data?.id) criados.push(res.body.data.id);
+    });
+
+    it('admin cria exercício tipo TEMPO → 201 e persiste tipo_exercicio', async () => {
+        asAdmin();
+        const res = await request(app)
+            .post('/api/exercicios')
+            .send(buildPayloadGlobal(`Tipo Tempo ${RUN_ID}`, { tipo_exercicio: 'TEMPO' }));
+
+        expect(res.status).toBe(201);
+        expect(res.body.data.tipo_exercicio).toBe('TEMPO');
+        if (res.body.data?.id) criados.push(res.body.data.id);
+    });
+
+    it('admin cria exercício tipo DISTANCIA → 201 e persiste tipo_exercicio', async () => {
+        asAdmin();
+        const res = await request(app)
+            .post('/api/exercicios')
+            .send(buildPayloadGlobal(`Tipo Distancia ${RUN_ID}`, { tipo_exercicio: 'DISTANCIA' }));
+
+        expect(res.status).toBe(201);
+        expect(res.body.data.tipo_exercicio).toBe('DISTANCIA');
+        if (res.body.data?.id) criados.push(res.body.data.id);
+    });
+
+    it('admin envia tipo_exercicio inválido → 422', async () => {
+        asAdmin();
+        const res = await request(app)
+            .post('/api/exercicios')
+            .send(buildPayloadGlobal(`Tipo Invalido ${RUN_ID}`, { tipo_exercicio: 'INVALIDO' }));
+
+        expect(res.status).toBe(422);
+    });
 });
 
 // GET /exercicios
@@ -1026,6 +1070,33 @@ describe('GET /exercicios', () => {
 
         expect(res.status).toBe(401);
     });
+
+    it('filtro tipo_exercicio=TEMPO retorna apenas exercícios desse tipo', async () => {
+        asAdmin();
+
+        const criadoTempo = await request(app)
+            .post('/api/exercicios')
+            .send(buildPayloadGlobal(`Filtro Tempo ${RUN_ID}`, { tipo_exercicio: 'TEMPO' }));
+        const idTempo = criadoTempo.body.data?.id as string;
+
+        const res = await request(app).get('/api/exercicios?tipo_exercicio=TEMPO&limite=100');
+
+        expect(res.status).toBe(200);
+        const dados = res.body.data.dados;
+        expect(Array.isArray(dados)).toBe(true);
+        for (const item of dados) {
+            expect(item.tipo_exercicio).toBe('TEMPO');
+        }
+        expect(dados.some((e: any) => e.id === idTempo)).toBe(true);
+
+        if (idTempo) await dbDeletarExercicio(idTempo);
+    });
+
+    it('filtro tipo_exercicio inválido → 422', async () => {
+        asAdmin();
+        const res = await request(app).get('/api/exercicios?tipo_exercicio=INVALIDO');
+        expect(res.status).toBe(422);
+    });
 });
 
 // GET /exercicios/:id
@@ -1376,6 +1447,59 @@ describe('PATCH /exercicios/:id', () => {
             .send({ nome: `Patch Sem Auth ${RUN_ID}` });
 
         expect(res.status).toBe(401);
+    });
+
+    it('admin altera tipo_exercicio de REPETICAO para TEMPO → 200', async () => {
+        asAdmin();
+        const res = await request(app)
+            .patch(`/api/exercicios/${exGlobalId}`)
+            .send({ tipo_exercicio: 'TEMPO' });
+
+        expect(res.status).toBe(200);
+        expect(res.body.data.tipo_exercicio).toBe('TEMPO');
+    });
+
+    it('admin envia tipo_exercicio inválido no PATCH → 422', async () => {
+        asAdmin();
+        const res = await request(app)
+            .patch(`/api/exercicios/${exGlobalId}`)
+            .send({ tipo_exercicio: 'INVALIDO' });
+
+        expect(res.status).toBe(422);
+    });
+
+    it('admin tenta mudar tipo_exercicio com referências em treino → 409', async () => {
+        asAdmin();
+        const criado = await request(app)
+            .post('/api/exercicios')
+            .send(buildPayloadGlobal(`PR Tipo Lock ${RUN_ID}`));
+        const exId = criado.body.data.id;
+
+        const [trCriado] = await DataBase.insert(treino).values({
+            nome: `Treino Lock ${RUN_ID} ${Date.now()}`,
+            usuario_id: alunoId,
+            treinador_id: null,
+        }).returning({ id: treino.id });
+
+        await DataBase.insert(treino_exercicio).values({
+            treino_id: trCriado.id,
+            exercicio_id: exId,
+            series: 3,
+            repeticoes: '10',
+            tempo_descanso_segundos: 60,
+            ordem_execucao: 1,
+        });
+
+        const res = await request(app)
+            .patch(`/api/exercicios/${exId}`)
+            .send({ tipo_exercicio: 'TEMPO' });
+
+        await DataBase.delete(treino_exercicio).where(eq(treino_exercicio.exercicio_id, exId)).catch(() => {});
+        await DataBase.delete(treino).where(eq(treino.id, trCriado.id)).catch(() => {});
+        await dbDeletarExercicio(exId);
+
+        expect(res.status).toBe(409);
+        expect(res.body.message).toMatch(/tipo_exercicio/i);
     });
 });
 
