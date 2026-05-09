@@ -51,6 +51,29 @@ export interface SyncCompletoResult {
 
 // Mapas de tradução
 
+// Palavras-chave que sinalizam exercício isométrico (medido por TEMPO)
+const TEMPO_KEYWORDS = [
+    'plank', 'prancha', 'hold', 'isometric', 'isometric',
+    'wall sit', 'wall-sit', 'l-sit', 'l sit', 'dead hang', 'dead-hang',
+    'hollow hold', 'flag hold', 'static', 'sustentação', 'isometria',
+];
+
+function inferirTipoExercicio(item: ExerciseDbItem): 'REPETICAO' | 'TEMPO' | 'DISTANCIA' {
+    const nomeLower = item.name.toLowerCase();
+    const bodyPartLower = item.bodyPart.toLowerCase().trim();
+    const targetLower = item.target.toLowerCase().trim();
+
+    if (bodyPartLower === 'cardio' || targetLower === 'cardiovascular system') {
+        return 'DISTANCIA';
+    }
+
+    if (TEMPO_KEYWORDS.some((kw) => nomeLower.includes(kw))) {
+        return 'TEMPO';
+    }
+
+    return 'REPETICAO';
+}
+
 // bodyPart da ExerciseDB → nosso enum grupo_muscular
 const BODY_PART_TO_GRUPO: Record<string, type_grupo_muscular> = {
     'chest': 'PEITO',
@@ -276,9 +299,10 @@ class ExerciseDbService {
                     '-c:v', 'libvpx-vp9',
                     '-b:v', '0',
                     '-crf', '34',
-                    '-pix_fmt', 'yuva420p',
+                    '-pix_fmt', 'yuv420p',
+                    '-deadline', 'good',
+                    '-cpu-used', '2',
                     '-an',
-                    '-loop', '0',
                     outFile,
                 ], { stdio: 'ignore' });
                 proc.on('error', reject);
@@ -532,6 +556,8 @@ class ExerciseDbService {
                     }
                 }
 
+                const tipoInferido = inferirTipoExercicio(item);
+
                 await DataBase.transaction(async (tx) => {
                     const [exercicioCriado] = await tx
                         .insert(exercicio)
@@ -540,6 +566,7 @@ class ExerciseDbService {
                             descricao,
                             animacao_url: animacaoUrl,
                             aluno_id: null,
+                            tipo_exercicio: tipoInferido,
                         })
                         .returning();
 
@@ -626,6 +653,42 @@ class ExerciseDbService {
             },
             requests_api_utilizadas: this.getRequestsRealizadas(),
         };
+    }
+
+    // Re-sincroniza a mídia de um exercício específico pelo nome em inglês (ExerciseDB).
+    // Força o download mesmo que animacao_url já exista — útil para re-processar após
+    // correção no pipeline de encoding.
+    async syncMidiaExercicio(nomeEn: string): Promise<{ animacao_url: string; nome_pt: string; exercicio_id: string }> {
+        const nomePt = translateExerciseName(nomeEn);
+
+        const [existente] = await DataBase
+            .select({ id: exercicio.id })
+            .from(exercicio)
+            .where(and(eq(exercicio.nome, nomePt), isNull(exercicio.aluno_id)));
+
+        if (!existente) {
+            throw new Error(`Exercício "${nomePt}" não encontrado no banco local. Execute o sync completo primeiro.`);
+        }
+
+        const resultados = await this.searchByName(nomeEn, 1, 0);
+        if (!resultados.length) {
+            throw new Error(`UPSTREAM: Exercício "${nomeEn}" não encontrado na ExerciseDB.`);
+        }
+
+        const item = resultados[0];
+        const gifBuffer = await this.fetchImageBuffer(item.id, '360');
+        if (!gifBuffer) {
+            throw new Error(`UPSTREAM: Imagem não disponível na ExerciseDB para "${nomeEn}".`);
+        }
+
+        const animacaoUrl = await this.cacheGifBufferToS3(gifBuffer, `${item.id}-${item.name}`);
+
+        await DataBase
+            .update(exercicio)
+            .set({ animacao_url: animacaoUrl })
+            .where(eq(exercicio.id, existente.id));
+
+        return { animacao_url: animacaoUrl, nome_pt: nomePt, exercicio_id: existente.id };
     }
 
     private capitalizar(s: string): string {

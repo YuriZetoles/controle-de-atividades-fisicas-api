@@ -54,10 +54,13 @@ let semPerfilUserId: string;
 // Exercícios globais usados nos treinos
 let exercicio1Id: string;
 let exercicio2Id: string;
+let exercicioTempoId: string;
+let exercicioDistanciaId: string;
 
 // Treinos seed
 let treinoAluno1Id: string;   // aluno1, 2 exercícios (3 séries cada), treinador atribuído
 let treinoAluno2Id: string;   // aluno2, 1 exercício (3 séries)
+let treinoTempoDistId: string; // aluno1, 1 TEMPO + 1 DISTANCIA
 
 const INVALID_UUID = 'nao-e-uuid';
 const NOT_FOUND_UUID = '00000000-0000-0000-0000-000000000000';
@@ -348,6 +351,42 @@ beforeAll(async () => {
         ordem_execucao: 1,
     });
 
+    // Exercícios TEMPO + DISTANCIA
+    const [exTempo] = await DataBase.insert(exercicio)
+        .values({ nome: `Prancha SS ${RUN_ID}`, aluno_id: null, tipo_exercicio: 'TEMPO' })
+        .returning({ id: exercicio.id });
+    exercicioTempoId = exTempo.id;
+
+    const [exDist] = await DataBase.insert(exercicio)
+        .values({ nome: `Corrida SS ${RUN_ID}`, aluno_id: null, tipo_exercicio: 'DISTANCIA' })
+        .returning({ id: exercicio.id });
+    exercicioDistanciaId = exDist.id;
+
+    // Treino tempo + distancia (aluno1)
+    const [trTD] = await DataBase.insert(treino).values({
+        nome: `Treino TD SS ${RUN_ID}`,
+        usuario_id: alunoId,
+        treinador_id: treinadorRecId,
+    }).returning({ id: treino.id });
+    treinoTempoDistId = trTD.id;
+
+    await DataBase.insert(treino_exercicio).values({
+        treino_id: treinoTempoDistId,
+        exercicio_id: exercicioTempoId,
+        series: 2,
+        duracao_sugerida_segundos: 45,
+        tempo_descanso_segundos: 60,
+        ordem_execucao: 1,
+    });
+    await DataBase.insert(treino_exercicio).values({
+        treino_id: treinoTempoDistId,
+        exercicio_id: exercicioDistanciaId,
+        series: 1,
+        distancia_sugerida_metros: 5000,
+        tempo_descanso_segundos: 0,
+        ordem_execucao: 2,
+    });
+
     asAdmin(); // padrão
 }, 30000);
 
@@ -367,10 +406,10 @@ afterAll(async () => {
     }
 
     // 2. Treinos (cascade → treino_exercicio)
-    await DataBase.delete(treino).where(inArray(treino.id, [treinoAluno1Id, treinoAluno2Id])).catch(() => {});
+    await DataBase.delete(treino).where(inArray(treino.id, [treinoAluno1Id, treinoAluno2Id, treinoTempoDistId])).catch(() => {});
 
     // 3. Exercícios seed
-    await DataBase.delete(exercicio).where(inArray(exercicio.id, [exercicio1Id, exercicio2Id])).catch(() => {});
+    await DataBase.delete(exercicio).where(inArray(exercicio.id, [exercicio1Id, exercicio2Id, exercicioTempoId, exercicioDistanciaId])).catch(() => {});
 
     // 4. Treinadores
     await DataBase.delete(treinador)
@@ -1762,6 +1801,132 @@ describe('PUT /sessoes/:id/exercicios/:exercicioId/series', () => {
             .send({ series: [{ numero_serie: 1, status: 'PENDENTE' }] });
 
         expect(res.status).toBe(401);
+    });
+
+    // ── Exercícios por tempo / distância ────────────────────────────────
+
+    describe('séries com tempo/distância', () => {
+        let sessaoTDId: string;
+        let exTempoSessaoId: string;
+        let exDistSessaoId: string;
+
+        beforeEach(async () => {
+            // Limpa sessões do outer beforeEach para liberar aluno1
+            await dbDeletarSessao(sessaoId).catch(() => {});
+            const { sessaoId: s, exercicioIds } = await dbCriarSessao(asAluno, treinoTempoDistId);
+            sessaoTDId = s;
+            exTempoSessaoId = exercicioIds[0];
+            exDistSessaoId = exercicioIds[1];
+        }, 15000);
+
+        afterEach(async () => {
+            await dbDeletarSessao(sessaoTDId).catch(() => {});
+        });
+
+        it('TEMPO série CONCLUIDA com tempo_realizado_segundos → 200 e persiste', async () => {
+            asAluno();
+            const res = await request(app)
+                .put(`/api/sessoes/${sessaoTDId}/exercicios/${exTempoSessaoId}/series`)
+                .send({
+                    series: [{ numero_serie: 1, status: 'CONCLUIDA', tempo_realizado_segundos: 47 }],
+                });
+
+            expect(res.status).toBe(200);
+            const ex = res.body.data.exercicios.find((e: any) => e.id === exTempoSessaoId);
+            expect(ex.series[0].tempo_realizado_segundos).toBe(47);
+            expect(ex.series[0].repeticoes_realizadas).toBeNull();
+        });
+
+        it('TEMPO CONCLUIDA sem tempo_realizado_segundos → 422', async () => {
+            asAluno();
+            const res = await request(app)
+                .put(`/api/sessoes/${sessaoTDId}/exercicios/${exTempoSessaoId}/series`)
+                .send({
+                    series: [{ numero_serie: 1, status: 'CONCLUIDA' }],
+                });
+
+            expect(res.status).toBe(422);
+            expect(res.body.message).toMatch(/tempo_realizado_segundos.*obrigatório/i);
+        });
+
+        it('TEMPO CONCLUIDA com repeticoes_realizadas → 422', async () => {
+            asAluno();
+            const res = await request(app)
+                .put(`/api/sessoes/${sessaoTDId}/exercicios/${exTempoSessaoId}/series`)
+                .send({
+                    series: [{ numero_serie: 1, status: 'CONCLUIDA', tempo_realizado_segundos: 30, repeticoes_realizadas: 10 }],
+                });
+
+            expect(res.status).toBe(422);
+            expect(res.body.message).toMatch(/repeticoes_realizadas não se aplica/i);
+        });
+
+        it('DISTANCIA CONCLUIDA com distancia_realizada_metros → 200', async () => {
+            asAluno();
+            const res = await request(app)
+                .put(`/api/sessoes/${sessaoTDId}/exercicios/${exDistSessaoId}/series`)
+                .send({
+                    series: [{ numero_serie: 1, status: 'CONCLUIDA', distancia_realizada_metros: 5200, tempo_realizado_segundos: 1800 }],
+                });
+
+            expect(res.status).toBe(200);
+            const ex = res.body.data.exercicios.find((e: any) => e.id === exDistSessaoId);
+            expect(ex.series[0].distancia_realizada_metros).toBe(5200);
+            expect(ex.series[0].tempo_realizado_segundos).toBe(1800);
+        });
+
+        it('DISTANCIA CONCLUIDA sem distancia_realizada_metros → 422', async () => {
+            asAluno();
+            const res = await request(app)
+                .put(`/api/sessoes/${sessaoTDId}/exercicios/${exDistSessaoId}/series`)
+                .send({
+                    series: [{ numero_serie: 1, status: 'CONCLUIDA' }],
+                });
+
+            expect(res.status).toBe(422);
+            expect(res.body.message).toMatch(/distancia_realizada_metros.*obrigatório/i);
+        });
+
+        it('REPETICAO CONCLUIDA com tempo_realizado_segundos → 422', async () => {
+            // Limpa sessão padrão do aluno2 + cria nova c/ exercicio REPETICAO
+            await dbDeletarSessao(sessaoAluno2Id).catch(() => {});
+            const { sessaoId: sRep, exercicioIds } = await dbCriarSessao(asAluno2, treinoAluno2Id);
+            const exRepId = exercicioIds[0];
+
+            const res = await request(app)
+                .put(`/api/sessoes/${sRep}/exercicios/${exRepId}/series`)
+                .send({
+                    series: [{ numero_serie: 1, status: 'CONCLUIDA', repeticoes_realizadas: 10, tempo_realizado_segundos: 30 }],
+                });
+
+            expect(res.status).toBe(422);
+            expect(res.body.message).toMatch(/tempo_realizado_segundos não se aplica/i);
+
+            await dbDeletarSessao(sRep).catch(() => {});
+        });
+
+        it('resumo da sessão TEMPO+DISTANCIA inclui tempo_total_isometria_segundos e distancia_total_metros', async () => {
+            asAluno();
+            await request(app)
+                .put(`/api/sessoes/${sessaoTDId}/exercicios/${exTempoSessaoId}/series`)
+                .send({
+                    series: [
+                        { numero_serie: 1, status: 'CONCLUIDA', tempo_realizado_segundos: 45 },
+                        { numero_serie: 2, status: 'CONCLUIDA', tempo_realizado_segundos: 50 },
+                    ],
+                });
+            await request(app)
+                .put(`/api/sessoes/${sessaoTDId}/exercicios/${exDistSessaoId}/series`)
+                .send({
+                    series: [{ numero_serie: 1, status: 'CONCLUIDA', distancia_realizada_metros: 5200 }],
+                });
+
+            const res = await request(app).get(`/api/sessoes/${sessaoTDId}/resumo`);
+
+            expect(res.status).toBe(200);
+            expect(res.body.data.tempo_total_isometria_segundos).toBe(95);
+            expect(res.body.data.distancia_total_metros).toBe(5200);
+        });
     });
 });
 

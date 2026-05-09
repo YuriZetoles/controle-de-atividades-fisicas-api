@@ -134,6 +134,10 @@ class SessaoController {
                     const msg = error.message.replace('UNPROCESSABLE: ', '');
                     return CommonResponse.error(res, HttpStatusCode.UNPROCESSABLE_ENTITY.code, null, null, [{ code: 'BUSINESS_RULE', message: msg }], msg);
                 }
+                if (error.message.startsWith('VALIDATION:')) {
+                    const msg = error.message.replace('VALIDATION: ', '');
+                    return CommonResponse.error(res, HttpStatusCode.UNPROCESSABLE_ENTITY.code, null, null, [{ code: 'BUSINESS_RULE', message: msg }], msg);
+                }
                 if (error.message === 'Sessão não encontrada' || error.message === 'Exercício não encontrado nesta sessão') {
                     return CommonResponse.error(res, HttpStatusCode.NOT_FOUND.code, null, null, [], error.message);
                 }

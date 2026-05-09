@@ -2,6 +2,7 @@ import { DataBase } from "../config/DbConnect";
 import { musculo, exercicio, exercicio_musculo, aparelho, exercicio_aparelho } from "../config/db/schema";
 import { seedAparelhos } from "./aparelhoSeeds";
 import type { type_grupo_muscular } from "../types/dbSchemas";
+import type { enum_tipo_exercicio } from "../types/enum";
 
 // Definição dos músculos
 
@@ -48,6 +49,7 @@ interface ExercicioSeed {
     primario: string;
     secundarios?: string[];
     aparelhos: string[];
+    tipo?: enum_tipo_exercicio;
 }
 
 const EXERCICIOS_POR_GRUPO: Record<string, ExercicioSeed[]> = {
@@ -360,6 +362,7 @@ const EXERCICIOS_POR_GRUPO: Record<string, ExercicioSeed[]> = {
             primario: "Abdominais",
             secundarios: ["Glúteos", "Eretores da Coluna"],
             aparelhos: ["Peso Corporal"],
+            tipo: "TEMPO",
         },
         {
             nome: "Crunch Abdominal",
@@ -395,6 +398,7 @@ const EXERCICIOS_POR_GRUPO: Record<string, ExercicioSeed[]> = {
             primario: "Oblíquos",
             secundarios: ["Abdominais"],
             aparelhos: ["Peso Corporal"],
+            tipo: "TEMPO",
         },
         {
             nome: "Torção Russa com Bola Medicinal",
@@ -533,6 +537,7 @@ export async function seedExercicios(): Promise<string[]> {
             nome: e.nome,
             descricao: e.descricao,
             aluno_id: null,
+            tipo_exercicio: e.tipo ?? "REPETICAO",
         }));
 
         const criados = await DataBase

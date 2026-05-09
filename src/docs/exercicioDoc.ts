@@ -17,6 +17,10 @@ const ExercicioResponse = z.object({
         example: "https://spotter.web.fslab.dev/animacoes/1713020123456-uuid.webm",
     }),
     aluno_id: z.string().uuid().nullable().openapi({ example: null }),
+    tipo_exercicio: z.enum(['REPETICAO', 'TEMPO', 'DISTANCIA']).openapi({
+        description: "Tipo de medição. REPETICAO=conta repetições; TEMPO=cronometra sustentação (prancha, isometria); DISTANCIA=distância percorrida (corrida, pedalada).",
+        example: "REPETICAO",
+    }),
     deletado_em: z.coerce.date().nullable().openapi({ example: null }),
     musculos: z.array(z.object({
         musculo_id: z.string().uuid().openapi({ example: "550e8400-e29b-41d4-a716-446655440001" }),

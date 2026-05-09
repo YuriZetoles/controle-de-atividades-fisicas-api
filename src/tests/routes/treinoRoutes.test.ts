@@ -59,6 +59,8 @@ let exercicioGlobalId: string;
 let exercicioPessoalAlunoId: string;
 let exercicioPessoalAluno2Id: string;
 let exercicioSoftDeletedId: string;
+let exercicioTempoId: string;
+let exercicioDistanciaId: string;
 let musculoId: string;
 let aparelhoId: string;
 
@@ -414,6 +416,28 @@ beforeAll(async () => {
     });
     await dbSoftDeletarExercicio(exercicioSoftDeletedId);
 
+    // Exercício tipo TEMPO (global)
+    const [exTempo] = await DataBase.insert(exercicio)
+        .values({ nome: `Prancha Global ${RUN_ID}`, aluno_id: null, tipo_exercicio: 'TEMPO' })
+        .returning({ id: exercicio.id });
+    exercicioTempoId = exTempo.id;
+    await DataBase.insert(exercicio_musculo).values({
+        exercicio_id: exercicioTempoId,
+        musculo_id: musculoId,
+        tipo_ativacao: 'PRIMARIO',
+    });
+
+    // Exercício tipo DISTANCIA (global)
+    const [exDist] = await DataBase.insert(exercicio)
+        .values({ nome: `Corrida Global ${RUN_ID}`, aluno_id: null, tipo_exercicio: 'DISTANCIA' })
+        .returning({ id: exercicio.id });
+    exercicioDistanciaId = exDist.id;
+    await DataBase.insert(exercicio_musculo).values({
+        exercicio_id: exercicioDistanciaId,
+        musculo_id: musculoId,
+        tipo_ativacao: 'PRIMARIO',
+    });
+
     asAdmin(); // padrão
 }, 30000);
 
@@ -431,7 +455,7 @@ afterAll(async () => {
     }
 
     // 2. Exercícios seed (restaurar deletado_em para poder deletar)
-    const exIds = [exercicioGlobalId, exercicioPessoalAlunoId, exercicioPessoalAluno2Id, exercicioSoftDeletedId];
+    const exIds = [exercicioGlobalId, exercicioPessoalAlunoId, exercicioPessoalAluno2Id, exercicioSoftDeletedId, exercicioTempoId, exercicioDistanciaId];
     await DataBase.delete(exercicio_aparelho).where(inArray(exercicio_aparelho.exercicio_id, exIds)).catch(() => {});
     await DataBase.delete(exercicio_musculo).where(inArray(exercicio_musculo.exercicio_id, exIds)).catch(() => {});
     await DataBase.delete(exercicio).where(inArray(exercicio.id, exIds)).catch(() => {});
@@ -656,14 +680,16 @@ describe('POST /treinos', () => {
         expect(res.body.message).toMatch(/usuário sem perfil para criar treinos/i);
     });
 
-    it('treinador puro sem aluno_id e sem perfil de aluno → 422', async () => {
+    it('treinador cria treino para si mesmo com treinador_id → 201', async () => {
         asTreinador();
         const res = await request(app)
             .post('/api/treinos')
-            .send({ nome: `Treino Treinador Sem Aluno ${RUN_ID}` });
+            .send({ nome: `Treino Treinador Self ${RUN_ID}`, treinador_id: treinadorRecId });
 
-        expect(res.status).toBe(422);
-        expect(res.body.message).toMatch(/aluno_id é obrigatório para este perfil/i);
+        expect(res.status).toBe(201);
+        expect(res.body.data.usuario_id).toBeNull();
+        expect(res.body.data.treinador_id).toBe(treinadorRecId);
+        if (res.body.data?.id) criados.push(res.body.data.id);
     });
 
     it('aluno_id inexistente → 404 Aluno não encontrado', async () => {
@@ -896,6 +922,126 @@ describe('POST /treinos', () => {
             .send({ nome: `Treino ${RUN_ID}` });
 
         expect(res.status).toBe(401);
+    });
+
+    // ── Exercícios por tempo / distância ─────────────────────────────────
+
+    it('cria treino com exercício tipo TEMPO + duracao_sugerida_segundos → 201', async () => {
+        asAluno();
+        const res = await request(app)
+            .post('/api/treinos')
+            .send({
+                nome: `Treino Prancha ${RUN_ID}`,
+                exercicios: [{
+                    exercicio_id: exercicioTempoId,
+                    series: 3,
+                    duracao_sugerida_segundos: 45,
+                    tempo_descanso_segundos: 60,
+                    ordem_execucao: 1,
+                }],
+            });
+
+        expect(res.status).toBe(201);
+        expect(res.body.data.exercicios).toHaveLength(1);
+        expect(res.body.data.exercicios[0].duracao_sugerida_segundos).toBe(45);
+        expect(res.body.data.exercicios[0].repeticoes).toBeNull();
+        if (res.body.data?.id) criados.push(res.body.data.id);
+    });
+
+    it('cria treino com TEMPO sem duracao_sugerida_segundos → 400', async () => {
+        asAluno();
+        const res = await request(app)
+            .post('/api/treinos')
+            .send({
+                nome: `Treino Tempo Sem Dur ${RUN_ID}`,
+                exercicios: [{
+                    exercicio_id: exercicioTempoId,
+                    series: 3,
+                    tempo_descanso_segundos: 60,
+                    ordem_execucao: 1,
+                }],
+            });
+
+        expect(res.status).toBe(422);
+        expect(res.body.message).toMatch(/duracao_sugerida_segundos/i);
+    });
+
+    it('cria treino com TEMPO + repeticoes → 400 (campo incompatível)', async () => {
+        asAluno();
+        const res = await request(app)
+            .post('/api/treinos')
+            .send({
+                nome: `Treino Tempo Com Rep ${RUN_ID}`,
+                exercicios: [{
+                    exercicio_id: exercicioTempoId,
+                    series: 3,
+                    repeticoes: '10-12',
+                    duracao_sugerida_segundos: 45,
+                    tempo_descanso_segundos: 60,
+                    ordem_execucao: 1,
+                }],
+            });
+
+        expect(res.status).toBe(422);
+        expect(res.body.message).toMatch(/repeticoes não se aplica/i);
+    });
+
+    it('cria treino com DISTANCIA + distancia_sugerida_metros → 201', async () => {
+        asAluno();
+        const res = await request(app)
+            .post('/api/treinos')
+            .send({
+                nome: `Treino Corrida ${RUN_ID}`,
+                exercicios: [{
+                    exercicio_id: exercicioDistanciaId,
+                    series: 1,
+                    distancia_sugerida_metros: 5000,
+                    tempo_descanso_segundos: 0,
+                    ordem_execucao: 1,
+                }],
+            });
+
+        expect(res.status).toBe(201);
+        expect(res.body.data.exercicios[0].distancia_sugerida_metros).toBe(5000);
+        if (res.body.data?.id) criados.push(res.body.data.id);
+    });
+
+    it('cria treino com REPETICAO sem repeticoes → 400', async () => {
+        asAluno();
+        const res = await request(app)
+            .post('/api/treinos')
+            .send({
+                nome: `Treino Rep Sem Rep ${RUN_ID}`,
+                exercicios: [{
+                    exercicio_id: exercicioGlobalId,
+                    series: 3,
+                    tempo_descanso_segundos: 60,
+                    ordem_execucao: 1,
+                }],
+            });
+
+        expect(res.status).toBe(422);
+        expect(res.body.message).toMatch(/repeticoes é obrigatório/i);
+    });
+
+    it('cria treino com REPETICAO + duracao_sugerida_segundos → 400', async () => {
+        asAluno();
+        const res = await request(app)
+            .post('/api/treinos')
+            .send({
+                nome: `Treino Rep Com Dur ${RUN_ID}`,
+                exercicios: [{
+                    exercicio_id: exercicioGlobalId,
+                    series: 3,
+                    repeticoes: '10-12',
+                    duracao_sugerida_segundos: 45,
+                    tempo_descanso_segundos: 60,
+                    ordem_execucao: 1,
+                }],
+            });
+
+        expect(res.status).toBe(422);
+        expect(res.body.message).toMatch(/duracao_sugerida_segundos não se aplica/i);
     });
 });
 

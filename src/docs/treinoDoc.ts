@@ -6,6 +6,7 @@ import {
     treinoDetalheQuerySchema,
     treinoListQuerySchema,
     treinoDeleteQuerySchema,
+    treinoDuplicarSchema,
 } from '../utils/validations/treinoValidation';
 
 export const treinoRegistry = new OpenAPIRegistry();
@@ -16,7 +17,7 @@ const TreinoResponse = z.object({
     descricao: z.string().nullable().openapi({ example: 'Treino focado em membros superiores' }),
     data_criacao: z.coerce.date().openapi({ example: '2026-03-17T10:00:00.000Z' }),
     deletado_em: z.coerce.date().nullable().openapi({ example: null }),
-    usuario_id: z.string().uuid().openapi({ example: '550e8400-e29b-41d4-a716-446655440000' }),
+    usuario_id: z.string().uuid().nullable().openapi({ example: '550e8400-e29b-41d4-a716-446655440000' }),
     treinador_id: z.string().uuid().nullable().openapi({ example: '550e8400-e29b-41d4-a716-446655440002' }),
     dias_semana: z
         .array(z.enum(['SEGUNDA', 'TERCA', 'QUARTA', 'QUINTA', 'SEXTA', 'SABADO', 'DOMINGO']))
@@ -32,14 +33,29 @@ const TreinoIdParam = z.object({
 const TreinoExercicioResponse = z.object({
     id: z.string().uuid().openapi({ example: '550e8400-e29b-41d4-a716-446655440020' }),
     series: z.number().openapi({ example: 4 }),
-    repeticoes: z.string().openapi({ example: '8-12' }),
+    repeticoes: z.string().nullable().openapi({
+        description: 'Faixa de repetições. Preenchido para exercícios tipo REPETICAO; null para TEMPO/DISTANCIA.',
+        example: '8-12',
+    }),
     carga_sugerida: z.string().nullable().openapi({ example: '30.00' }),
+    duracao_sugerida_segundos: z.number().nullable().openapi({
+        description: 'Duração sugerida em segundos. Preenchido para exercícios tipo TEMPO; null caso contrário.',
+        example: 45,
+    }),
+    distancia_sugerida_metros: z.number().nullable().openapi({
+        description: 'Distância sugerida em metros. Preenchido para exercícios tipo DISTANCIA; null caso contrário.',
+        example: 5000,
+    }),
     tempo_descanso_segundos: z.number().openapi({ example: 90 }),
     ordem_execucao: z.number().openapi({ example: 1 }),
     exercicio: z.object({
         id: z.string().uuid().openapi({ example: '550e8400-e29b-41d4-a716-446655440030' }),
         nome: z.string().openapi({ example: 'Supino Reto' }),
         descricao: z.string().nullable().openapi({ example: 'Exercício para peitorais' }),
+        tipo_exercicio: z.enum(['REPETICAO', 'TEMPO', 'DISTANCIA']).openapi({
+            description: 'Tipo de medição do exercício',
+            example: 'REPETICAO',
+        }),
         musculos: z.array(
             z.object({
                 musculo_id: z.string().uuid().openapi({ example: '550e8400-e29b-41d4-a716-446655440040' }),
@@ -75,7 +91,7 @@ treinoRegistry.registerPath({
     method: 'post',
     path: '/treinos',
     summary: 'Criar treino',
-    description: 'Cria um novo treino. Pode ser criado sem exercícios ou já com composição inicial. Aluno pode criar apenas treino próprio; treinador/admin podem criar para qualquer aluno existente. O treinador criador é vinculado automaticamente.',
+    description: 'Cria um novo treino. Pode ser criado sem exercícios ou já com composição inicial. Aluno pode criar apenas treino próprio; treinador/admin podem criar para qualquer aluno existente. Treinador também pode criar treino próprio sem aluno_id (treinador_id é inferido do autenticado ou informado pelo admin).',
     tags: ['Treino'],
     security: [{ BearerAuth: [] }],
     request: {
@@ -247,5 +263,44 @@ treinoRegistry.registerPath({
         403: { description: 'Sem permissão para excluir este treino' },
         404: { description: 'Treino não encontrado' },
         422: { description: 'ID inválido' },
+    },
+});
+
+// POST /treinos/{id}/duplicar
+treinoRegistry.registerPath({
+    method: 'post',
+    path: '/treinos/{id}/duplicar',
+    summary: 'Duplicar treino para aluno(s)',
+    description: 'Duplica um treino existente para um ou mais alunos vinculados. Mantém a estrutura de exercícios e séries, criando novos treinos para cada aluno informado.',
+    tags: ['Treino'],
+    security: [{ BearerAuth: [] }],
+    request: {
+        params: TreinoIdParam,
+        body: {
+            required: true,
+            content: {
+                'application/json': { schema: treinoDuplicarSchema },
+            },
+        },
+    },
+    responses: {
+        201: {
+            description: 'Treino(s) duplicado(s) com sucesso',
+            content: {
+                'application/json': {
+                    schema: z.object({
+                        error: z.boolean().openapi({ example: false }),
+                        code: z.number().openapi({ example: 201 }),
+                        message: z.string().nullable().openapi({ example: 'Recurso criado com sucesso' }),
+                        data: z.array(TreinoDetalhadoResponse),
+                        errors: z.array(z.any()),
+                    }),
+                },
+            },
+        },
+        401: { description: 'Não autorizado' },
+        403: { description: 'Sem permissão para duplicar este treino' },
+        404: { description: 'Treino não encontrado' },
+        422: { description: 'Erro de validação' },
     },
 });

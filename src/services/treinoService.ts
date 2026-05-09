@@ -13,8 +13,10 @@ import {
     treinoDetalheQuerySchema,
     treinoListQuerySchema,
     treinoDeleteQuerySchema,
+    treinoDuplicarSchema,
 } from '../utils/validations/treinoValidation';
 import { type_treino } from '../types/dbSchemas';
+import { mapTreinoTemplateParaAluno } from '../utils/treinoTemplateMapper';
 
 class TreinoService {
     private repository: TreinoRepository;
@@ -25,10 +27,52 @@ class TreinoService {
         this.usuarioRepository = new UsuarioRepository();
     }
 
+    private validarCamposPorTipo(
+        item: { repeticoes?: string | null; duracao_sugerida_segundos?: number | null; distancia_sugerida_metros?: number | null },
+        tipo: 'REPETICAO' | 'TEMPO' | 'DISTANCIA',
+        contexto: string,
+    ): void {
+        const repeticoesPreenchido = item.repeticoes !== undefined && item.repeticoes !== null && item.repeticoes !== '';
+        const duracaoPreenchida = item.duracao_sugerida_segundos !== undefined && item.duracao_sugerida_segundos !== null;
+        const distanciaPreenchida = item.distancia_sugerida_metros !== undefined && item.distancia_sugerida_metros !== null;
+
+        if (tipo === 'REPETICAO') {
+            if (!repeticoesPreenchido) {
+                throw new Error(`VALIDATION: ${contexto} repeticoes é obrigatório para exercícios tipo REPETICAO`);
+            }
+            if (duracaoPreenchida) {
+                throw new Error(`VALIDATION: ${contexto} duracao_sugerida_segundos não se aplica a exercícios tipo REPETICAO`);
+            }
+            if (distanciaPreenchida) {
+                throw new Error(`VALIDATION: ${contexto} distancia_sugerida_metros não se aplica a exercícios tipo REPETICAO`);
+            }
+        } else if (tipo === 'TEMPO') {
+            if (!duracaoPreenchida) {
+                throw new Error(`VALIDATION: ${contexto} duracao_sugerida_segundos é obrigatório para exercícios tipo TEMPO`);
+            }
+            if (repeticoesPreenchido) {
+                throw new Error(`VALIDATION: ${contexto} repeticoes não se aplica a exercícios tipo TEMPO`);
+            }
+            if (distanciaPreenchida) {
+                throw new Error(`VALIDATION: ${contexto} distancia_sugerida_metros não se aplica a exercícios tipo TEMPO`);
+            }
+        } else if (tipo === 'DISTANCIA') {
+            if (!distanciaPreenchida) {
+                throw new Error(`VALIDATION: ${contexto} distancia_sugerida_metros é obrigatório para exercícios tipo DISTANCIA`);
+            }
+            if (repeticoesPreenchido) {
+                throw new Error(`VALIDATION: ${contexto} repeticoes não se aplica a exercícios tipo DISTANCIA`);
+            }
+            if (duracaoPreenchida) {
+                throw new Error(`VALIDATION: ${contexto} duracao_sugerida_segundos não se aplica a exercícios tipo DISTANCIA`);
+            }
+        }
+    }
+
     private async validarExerciciosParaVinculo(
         itens: TreinoExercicioPatchInput[],
         perfil: Awaited<ReturnType<UsuarioRepository['buscarPerfilAcesso']>>,
-        alunoIdDonoDoTreino: string,
+        alunoIdDonoDoTreino: string | null,
     ): Promise<void> {
         if (itens.length === 0) {
             return;
@@ -46,6 +90,14 @@ class TreinoService {
             throw new Error('VALIDATION: não é permitido adicionar exercício inativo ao treino');
         }
 
+        const tipoPorExercicioId = new Map(exerciciosEncontrados.map((e) => [e.id, e.tipo_exercicio]));
+        for (const item of itens) {
+            const tipo = tipoPorExercicioId.get(item.exercicio_id);
+            if (tipo) {
+                this.validarCamposPorTipo(item, tipo, `exercicio_id ${item.exercicio_id}:`);
+            }
+        }
+
         const exerciciosSemPermissao = exerciciosEncontrados.filter((item) => {
             if (item.aluno_id === null) {
                 return false;
@@ -59,7 +111,7 @@ class TreinoService {
                 return false;
             }
 
-            if (perfil.isTreinador && item.aluno_id === alunoIdDonoDoTreino) {
+            if (perfil.isTreinador && alunoIdDonoDoTreino && item.aluno_id === alunoIdDonoDoTreino) {
                 return false;
             }
 
@@ -76,10 +128,26 @@ class TreinoService {
             const dadosValidados = treinoSchema.parse(body);
             const perfil = await this.usuarioRepository.buscarPerfilAcesso(userId);
             const usuarioPodeCriar = perfil.isAluno || perfil.isTreinador || perfil.isAdmin;
-            let alunoIdDestino = dadosValidados.aluno_id;
+            let alunoIdDestino = dadosValidados.aluno_id ?? null;
+            const treinadorIdInput = dadosValidados.treinador_id ?? null;
 
             if (!usuarioPodeCriar) {
                 throw new Error('FORBIDDEN: usuário sem perfil para criar treinos');
+            }
+
+            if (treinadorIdInput) {
+                if (!perfil.isTreinador && !perfil.isAdmin) {
+                    throw new Error('FORBIDDEN: apenas treinadores ou administradores podem criar treinos para treinador');
+                }
+
+                if (!perfil.isAdmin && treinadorIdInput !== perfil.treinadorId) {
+                    throw new Error('FORBIDDEN: treinador_id deve corresponder ao treinador autenticado');
+                }
+
+                const treinadorExiste = await this.repository.verificarTreinadorExiste(treinadorIdInput);
+                if (!treinadorExiste) {
+                    throw new Error('VALIDATION: treinador não encontrado');
+                }
             }
 
             // Aluno cria apenas treino próprio e não pode criar para outro aluno.
@@ -87,25 +155,33 @@ class TreinoService {
                 if (alunoIdDestino && alunoIdDestino !== perfil.alunoId) {
                     throw new Error('FORBIDDEN: aluno só pode criar treino para si mesmo');
                 }
-                alunoIdDestino = perfil.alunoId ?? undefined;
+                alunoIdDestino = perfil.alunoId;
             }
 
-            // Treinador/admin precisam informar o aluno de destino, exceto quando também tiverem perfil de aluno.
+            // Se não houver aluno_id, tenta assumir aluno do perfil (caso exista) ou cria treino do treinador.
             if (!alunoIdDestino) {
-                if (perfil.alunoId) {
+                if (perfil.alunoId && !treinadorIdInput) {
                     alunoIdDestino = perfil.alunoId;
-                } else {
-                    throw new Error('VALIDATION: aluno_id é obrigatório para este perfil');
                 }
             }
 
-            const alunoExiste = await this.repository.verificarAlunoExiste(alunoIdDestino);
-            if (!alunoExiste) {
-                throw new Error('Aluno não encontrado');
+            const treinadorIdDestino = alunoIdDestino
+                ? (perfil.isTreinador ? perfil.treinadorId : null)
+                : (treinadorIdInput ?? perfil.treinadorId ?? null);
+
+            if (!alunoIdDestino && !treinadorIdDestino) {
+                throw new Error('VALIDATION: aluno_id ou treinador_id é obrigatório para este perfil');
+            }
+
+            if (alunoIdDestino) {
+                const alunoExiste = await this.repository.verificarAlunoExiste(alunoIdDestino);
+                if (!alunoExiste) {
+                    throw new Error('Aluno não encontrado');
+                }
             }
 
             // Pula verificação de vínculo quando o treinador está criando treino para o próprio perfil de aluno (usuário híbrido)
-            if (perfil.isTreinador && !perfil.isAdmin && perfil.treinadorId && alunoIdDestino !== perfil.alunoId) {
+            if (perfil.isTreinador && !perfil.isAdmin && perfil.treinadorId && alunoIdDestino && alunoIdDestino !== perfil.alunoId) {
                 const vinculado = await this.usuarioRepository.alunoVinculadoAoTreinador(
                     alunoIdDestino,
                     perfil.treinadorId,
@@ -120,7 +196,7 @@ class TreinoService {
                 nome: dadosValidados.nome,
                 descricao: dadosValidados.descricao ?? null,
                 usuario_id: alunoIdDestino,
-                treinador_id: perfil.treinadorId,
+                treinador_id: treinadorIdDestino,
                 dias_semana: dadosValidados.dias_semana ?? null,
                 ordem: dadosValidados.ordem ?? null,
             };
@@ -168,9 +244,9 @@ class TreinoService {
 
         const podeVisualizar =
             perfil.isAdmin ||
-            perfil.alunoId === treinoEncontrado.usuario_id ||
+            (treinoEncontrado.usuario_id !== null && perfil.alunoId === treinoEncontrado.usuario_id) ||
             (perfil.treinadorId !== null && perfil.treinadorId === treinoEncontrado.treinador_id) ||
-            (perfil.isTreinador && perfil.treinadorId !== null &&
+            (perfil.isTreinador && perfil.treinadorId !== null && treinoEncontrado.usuario_id !== null &&
                 await this.usuarioRepository.alunoVinculadoAoTreinador(
                     treinoEncontrado.usuario_id,
                     perfil.treinadorId,
@@ -207,23 +283,13 @@ class TreinoService {
                     perfil.treinadorId!,
                 );
 
-                if (alunosVinculados.length === 0) {
-                    return {
-                        dados: [],
-                        total: 0,
-                        page: filtrosLista.page,
-                        limite: filtrosLista.limite,
-                        totalPages: 0,
-                    };
-                }
-
                 if (filtrosLista.usuario_id && !alunosVinculados.includes(filtrosLista.usuario_id)) {
                     throw new Error('FORBIDDEN: treinador só pode listar treinos de alunos vinculados ao seu perfil');
                 }
 
-                usuarioIdsPermitidos = filtrosLista.usuario_id
-                    ? [filtrosLista.usuario_id]
-                    : alunosVinculados;
+                if (filtrosLista.usuario_id) {
+                    usuarioIdsPermitidos = [filtrosLista.usuario_id];
+                }
 
                 filtrosLista.treinador_id = perfil.treinadorId ?? undefined;
             } else if (perfil.isAluno) {
@@ -269,9 +335,9 @@ class TreinoService {
 
         const podeAtualizar =
             perfil.isAdmin ||
-            perfil.alunoId === treinoAtual.usuario_id ||
+            (treinoAtual.usuario_id !== null && perfil.alunoId === treinoAtual.usuario_id) ||
             (perfil.treinadorId !== null && perfil.treinadorId === treinoAtual.treinador_id) ||
-            (perfil.isTreinador && perfil.treinadorId !== null &&
+            (perfil.isTreinador && perfil.treinadorId !== null && treinoAtual.usuario_id !== null &&
                 await this.usuarioRepository.alunoVinculadoAoTreinador(
                     treinoAtual.usuario_id,
                     perfil.treinadorId,
@@ -351,6 +417,16 @@ class TreinoService {
                 throw new Error(
                     'VALIDATION: um ou mais itens de atualizar_exercicios não pertencem a este treino ou estão sendo removidos',
                 );
+            }
+
+            for (const update of atualizarExercicios) {
+                const existente = idsItemDoTreino.get(update.id)!;
+                const merged = {
+                    repeticoes: update.repeticoes !== undefined ? update.repeticoes : existente.repeticoes,
+                    duracao_sugerida_segundos: update.duracao_sugerida_segundos !== undefined ? update.duracao_sugerida_segundos : existente.duracao_sugerida_segundos,
+                    distancia_sugerida_metros: update.distancia_sugerida_metros !== undefined ? update.distancia_sugerida_metros : existente.distancia_sugerida_metros,
+                };
+                this.validarCamposPorTipo(merged, existente.exercicio.tipo_exercicio, `atualizar_exercicios id ${update.id}:`);
             }
 
             const idsAtualizando = new Set(atualizarExercicios.map((item) => item.id));
@@ -463,9 +539,9 @@ class TreinoService {
 
         const podeDeletar =
             perfil.isAdmin ||
-            perfil.alunoId === treinoExistente.usuario_id ||
+            (treinoExistente.usuario_id !== null && perfil.alunoId === treinoExistente.usuario_id) ||
             (perfil.treinadorId !== null && perfil.treinadorId === treinoExistente.treinador_id) ||
-            (perfil.isTreinador && perfil.treinadorId !== null &&
+            (perfil.isTreinador && perfil.treinadorId !== null && treinoExistente.usuario_id !== null &&
                 await this.usuarioRepository.alunoVinculadoAoTreinador(
                     treinoExistente.usuario_id,
                     perfil.treinadorId,
@@ -486,6 +562,55 @@ class TreinoService {
 
         const treinoDeletado = await this.repository.softDelete(id);
         return { treino: treinoDeletado, tipo_exclusao: 'soft' };
+    }
+
+    async duplicarTreinoParaAlunos(
+        idParam: string,
+        body: unknown,
+        userId: string,
+    ): Promise<TreinoComExercicios[]> {
+        const id = treinoIdSchema.parse(idParam);
+        const dadosValidados = treinoDuplicarSchema.parse(body);
+        const perfil = await this.usuarioRepository.buscarPerfilAcesso(userId);
+
+        if (!perfil.isTreinador && !perfil.isAdmin) {
+            throw new Error('FORBIDDEN: apenas treinadores ou administradores podem duplicar treinos');
+        }
+
+        const treinoTemplate = await this.repository.findById(
+            id,
+            treinoDetalheQuerySchema.parse({ apenas_ativos: true }),
+        );
+
+        if (!treinoTemplate) {
+            throw new Error('Treino não encontrado');
+        }
+
+        const podeVisualizar =
+            perfil.isAdmin ||
+            (treinoTemplate.usuario_id !== null && perfil.alunoId === treinoTemplate.usuario_id) ||
+            (perfil.treinadorId !== null && perfil.treinadorId === treinoTemplate.treinador_id) ||
+            (perfil.isTreinador && perfil.treinadorId !== null && treinoTemplate.usuario_id !== null &&
+                await this.usuarioRepository.alunoVinculadoAoTreinador(
+                    treinoTemplate.usuario_id,
+                    perfil.treinadorId,
+                ));
+
+        if (!podeVisualizar) {
+            throw new Error('FORBIDDEN: você não tem permissão para duplicar este treino');
+        }
+
+        const alunoIds = dadosValidados.aluno_ids
+            ?? (dadosValidados.aluno_id ? [dadosValidados.aluno_id] : []);
+
+        const resultados: TreinoComExercicios[] = [];
+        for (const alunoId of alunoIds) {
+            const payload = mapTreinoTemplateParaAluno(treinoTemplate, alunoId);
+            const criado = await this.createTreino(payload, userId);
+            resultados.push(criado);
+        }
+
+        return resultados;
     }
 }
 

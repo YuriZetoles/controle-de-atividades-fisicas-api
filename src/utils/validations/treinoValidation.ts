@@ -17,15 +17,33 @@ const exercicioItemSchema = z.object({
     repeticoes: z
         .string()
         .trim()
-        .min(1, { message: 'repeticoes é obrigatório' })
+        .min(1, { message: 'repeticoes é obrigatório quando informado' })
         .max(50, { message: 'repeticoes deve ter no máximo 50 caracteres' })
-        .openapi({ description: 'Faixa de repetições', example: '8-12' }),
+        .nullable()
+        .optional()
+        .openapi({ description: 'Faixa de repetições (obrigatório para exercícios tipo REPETICAO)', example: '8-12' }),
     carga_sugerida: z
         .number()
         .positive({ message: 'carga_sugerida deve ser positiva' })
         .nullable()
         .optional()
         .openapi({ description: 'Carga sugerida em kg (opcional)', example: 30 }),
+    duracao_sugerida_segundos: z
+        .number()
+        .int({ message: 'duracao_sugerida_segundos deve ser inteiro' })
+        .min(1, { message: 'duracao_sugerida_segundos deve ser maior que 0' })
+        .max(7200, { message: 'duracao_sugerida_segundos deve ser no máximo 7200 (2h)' })
+        .nullable()
+        .optional()
+        .openapi({ description: 'Duração sugerida em segundos (obrigatório para exercícios tipo TEMPO)', example: 45 }),
+    distancia_sugerida_metros: z
+        .number()
+        .int({ message: 'distancia_sugerida_metros deve ser inteiro' })
+        .min(1, { message: 'distancia_sugerida_metros deve ser maior que 0' })
+        .max(200000, { message: 'distancia_sugerida_metros deve ser no máximo 200000 (200km)' })
+        .nullable()
+        .optional()
+        .openapi({ description: 'Distância sugerida em metros (obrigatório para exercícios tipo DISTANCIA)', example: 5000 }),
     tempo_descanso_segundos: z
         .number()
         .int({ message: 'tempo_descanso_segundos deve ser inteiro' })
@@ -70,6 +88,14 @@ const treinoSchema = z.object({
         .uuid({ message: 'O ID do aluno deve ser um UUID válido' })
         .optional()
         .openapi({ description: 'UUID do aluno dono do treino', example: '550e8400-e29b-41d4-a716-446655440000' }),
+    treinador_id: z
+        .string()
+        .uuid({ message: 'treinador_id deve ser um UUID válido' })
+        .optional()
+        .openapi({
+            description: 'UUID do treinador dono do treino (para treinos sem aluno)',
+            example: '550e8400-e29b-41d4-a716-446655440002',
+        }),
     dias_semana: z
         .array(diasSemanaEnum)
         .nullable()
@@ -87,6 +113,14 @@ const treinoSchema = z.object({
         .optional()
         .openapi({ description: 'Composição inicial do treino' }),
 }).strict().superRefine((dados, ctx) => {
+    if (dados.aluno_id && dados.treinador_id) {
+        ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ['treinador_id'],
+            message: 'Informe apenas um entre aluno_id e treinador_id',
+        });
+    }
+
     if (dados.exercicios && dados.exercicios.length > 0) {
         const ordens = dados.exercicios.map((item) => item.ordem_execucao);
         const ordensDuplicadas = ordens.filter((ordem, idx) => ordens.indexOf(ordem) !== idx);
@@ -166,16 +200,33 @@ const treinoUpdateSchema = z.object({
                 repeticoes: z
                     .string()
                     .trim()
-                    .min(1, { message: 'repeticoes é obrigatório' })
+                    .min(1, { message: 'repeticoes é obrigatório quando informado' })
                     .max(50, { message: 'repeticoes deve ter no máximo 50 caracteres' })
+                    .nullable()
                     .optional()
-                    .openapi({ description: 'Nova faixa de repetições', example: '10-15' }),
+                    .openapi({ description: 'Nova faixa de repetições. Envie null para remover.', example: '10-15' }),
                 carga_sugerida: z
                     .number()
                     .positive({ message: 'carga_sugerida deve ser positiva' })
                     .nullable()
                     .optional()
                     .openapi({ description: 'Nova carga sugerida em kg. Envie null para remover.', example: 35 }),
+                duracao_sugerida_segundos: z
+                    .number()
+                    .int({ message: 'duracao_sugerida_segundos deve ser inteiro' })
+                    .min(1, { message: 'duracao_sugerida_segundos deve ser maior que 0' })
+                    .max(7200, { message: 'duracao_sugerida_segundos deve ser no máximo 7200 (2h)' })
+                    .nullable()
+                    .optional()
+                    .openapi({ description: 'Nova duração sugerida em segundos. Envie null para remover.', example: 60 }),
+                distancia_sugerida_metros: z
+                    .number()
+                    .int({ message: 'distancia_sugerida_metros deve ser inteiro' })
+                    .min(1, { message: 'distancia_sugerida_metros deve ser maior que 0' })
+                    .max(200000, { message: 'distancia_sugerida_metros deve ser no máximo 200000 (200km)' })
+                    .nullable()
+                    .optional()
+                    .openapi({ description: 'Nova distância sugerida em metros. Envie null para remover.', example: 5000 }),
                 tempo_descanso_segundos: z
                     .number()
                     .int({ message: 'tempo_descanso_segundos deve ser inteiro' })
@@ -190,7 +241,7 @@ const treinoUpdateSchema = z.object({
                     .optional()
                     .openapi({ description: 'Nova ordem de execução', example: 2 }),
             }).strict().refine(
-                (data) => ['series', 'repeticoes', 'carga_sugerida', 'tempo_descanso_segundos', 'ordem_execucao']
+                (data) => ['series', 'repeticoes', 'carga_sugerida', 'duracao_sugerida_segundos', 'distancia_sugerida_metros', 'tempo_descanso_segundos', 'ordem_execucao']
                     .some((k) => k in data && data[k as keyof typeof data] !== undefined),
                 { message: 'Informe ao menos um campo para atualizar além do id' },
             ),
@@ -438,7 +489,35 @@ const treinoDeleteQuerySchema = z.object({
         }),
 }).strict().openapi('TreinoDeleteQuery');
 
+const treinoDuplicarSchema = z.object({
+    aluno_id: z
+        .string()
+        .uuid({ message: 'aluno_id deve ser um UUID válido' })
+        .optional()
+        .openapi({ description: 'UUID do aluno de destino', example: '550e8400-e29b-41d4-a716-446655440000' }),
+    aluno_ids: z
+        .array(z.string().uuid({ message: 'Cada item de aluno_ids deve ser um UUID válido' }))
+        .min(1, { message: 'aluno_ids deve conter ao menos 1 item' })
+        .optional()
+        .openapi({ description: 'Lista de UUIDs de alunos de destino', example: ['550e8400-e29b-41d4-a716-446655440000'] }),
+}).strict()
+    .refine((dados) => Boolean(dados.aluno_id || dados.aluno_ids?.length), {
+        message: 'Informe aluno_id ou aluno_ids',
+    })
+    .refine((dados) => !(dados.aluno_id && dados.aluno_ids), {
+        message: 'Informe apenas um entre aluno_id e aluno_ids',
+    })
+    .openapi('TreinoDuplicarInput');
+
 type TreinoDeleteQuery = z.infer<typeof treinoDeleteQuerySchema>;
 
-export { treinoSchema, treinoUpdateSchema, treinoIdSchema, treinoDetalheQuerySchema, treinoListQuerySchema, treinoDeleteQuerySchema };
+export {
+    treinoSchema,
+    treinoUpdateSchema,
+    treinoIdSchema,
+    treinoDetalheQuerySchema,
+    treinoListQuerySchema,
+    treinoDeleteQuerySchema,
+    treinoDuplicarSchema,
+};
 export type { TreinoDetalheQuery, TreinoListQuery, TreinoDeleteQuery };

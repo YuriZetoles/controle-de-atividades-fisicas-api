@@ -64,7 +64,8 @@ class ExercicioRepository {
                 .comEscopo(filtros.escopo, filtros.aluno_id)
                 .comEmUso(filtros.em_uso)
                 .comGrupoMuscular(filtros.grupo_muscular)
-                .comTipoAtivacao(filtros.tipo_ativacao);
+                .comTipoAtivacao(filtros.tipo_ativacao)
+                .comTipoExercicio(filtros.tipo_exercicio);
 
             if (!filtros.incluir_inativos) {
                 filterBuilder.apenasAtivos();

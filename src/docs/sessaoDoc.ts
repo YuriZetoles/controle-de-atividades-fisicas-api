@@ -7,8 +7,23 @@ export const sessaoRegistry = new OpenAPIRegistry();
 const SessaoSerieResponse = z.object({
     id: z.string().uuid().openapi({ example: "550e8400-e29b-41d4-a716-446655440010" }),
     numero_serie: z.number().openapi({ example: 1 }),
-    repeticoes_realizadas: z.number().nullable().openapi({ example: null }),
+    repeticoes_realizadas: z.number().nullable().openapi({
+        description: "Repetições realizadas (REPETICAO). Null para outros tipos.",
+        example: null,
+    }),
     carga_utilizada: z.string().nullable().openapi({ example: null }),
+    tempo_realizado_segundos: z.number().nullable().openapi({
+        description: "Tempo sustentado em segundos (TEMPO; opcional para DISTANCIA cronometrada).",
+        example: 47,
+    }),
+    distancia_realizada_metros: z.number().nullable().openapi({
+        description: "Distância percorrida em metros (DISTANCIA).",
+        example: 5200,
+    }),
+    pace_segundos_por_km: z.number().nullable().openapi({
+        description: "Pace calculado em segundos/km (apenas DISTANCIA com tempo + distância preenchidos). Derivado: tempo_realizado_segundos / distancia_realizada_metros × 1000.",
+        example: 360,
+    }),
     status: z.enum(['PENDENTE', 'CONCLUIDA', 'PULADA']).openapi({ example: "PENDENTE" }),
     observacoes: z.string().nullable().openapi({ example: null }),
 }).openapi("SessaoSerie");
@@ -25,11 +40,14 @@ const SessaoExercicioResponse = z.object({
         id: z.string().uuid().openapi({ example: "550e8400-e29b-41d4-a716-446655440003" }),
         nome: z.string().openapi({ example: "Supino Reto" }),
         descricao: z.string().nullable().openapi({ example: "Exercício para peitorais" }),
+        tipo_exercicio: z.enum(['REPETICAO', 'TEMPO', 'DISTANCIA']).openapi({ example: 'REPETICAO' }),
     }),
     template: z.object({
         series: z.number().openapi({ example: 4 }),
-        repeticoes: z.string().openapi({ example: "12" }),
+        repeticoes: z.string().nullable().openapi({ example: "12" }),
         carga_sugerida: z.string().nullable().openapi({ example: "80.00" }),
+        duracao_sugerida_segundos: z.number().nullable().openapi({ example: 45 }),
+        distancia_sugerida_metros: z.number().nullable().openapi({ example: 5000 }),
         tempo_descanso_segundos: z.number().openapi({ example: 90 }),
         ordem_execucao: z.number().openapi({ example: 1 }),
     }),
@@ -66,6 +84,18 @@ const SessaoResumoResponse = z.object({
     series_concluidas: z.number().openapi({ example: 16 }),
     series_total: z.number().openapi({ example: 20 }),
     volume_total_kg: z.number().openapi({ example: 4800.5 }),
+    tempo_total_isometria_segundos: z.number().openapi({
+        description: "Soma do tempo realizado de séries CONCLUIDAS de exercícios tipo TEMPO",
+        example: 270,
+    }),
+    distancia_total_metros: z.number().openapi({
+        description: "Soma da distância realizada de séries CONCLUIDAS de exercícios tipo DISTANCIA",
+        example: 5200,
+    }),
+    pace_medio_segundos_por_km: z.number().nullable().openapi({
+        description: "Pace médio em segundos/km, considerando apenas séries DISTANCIA com tempo + distância preenchidos. Null se nenhuma série qualificar.",
+        example: 360,
+    }),
     taxa_conclusao: z.number().openapi({ example: 80 }),
 }).openapi("SessaoResumo");
 
