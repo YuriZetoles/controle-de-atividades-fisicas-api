@@ -680,14 +680,16 @@ describe('POST /treinos', () => {
         expect(res.body.message).toMatch(/usuário sem perfil para criar treinos/i);
     });
 
-    it('treinador puro sem aluno_id e sem perfil de aluno → 422', async () => {
+    it('treinador cria treino para si mesmo com treinador_id → 201', async () => {
         asTreinador();
         const res = await request(app)
             .post('/api/treinos')
-            .send({ nome: `Treino Treinador Sem Aluno ${RUN_ID}` });
+            .send({ nome: `Treino Treinador Self ${RUN_ID}`, treinador_id: treinadorRecId });
 
-        expect(res.status).toBe(422);
-        expect(res.body.message).toMatch(/aluno_id é obrigatório para este perfil/i);
+        expect(res.status).toBe(201);
+        expect(res.body.data.usuario_id).toBeNull();
+        expect(res.body.data.treinador_id).toBe(treinadorRecId);
+        if (res.body.data?.id) criados.push(res.body.data.id);
     });
 
     it('aluno_id inexistente → 404 Aluno não encontrado', async () => {

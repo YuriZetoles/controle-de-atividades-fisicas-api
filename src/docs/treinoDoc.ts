@@ -6,6 +6,7 @@ import {
     treinoDetalheQuerySchema,
     treinoListQuerySchema,
     treinoDeleteQuerySchema,
+    treinoDuplicarSchema,
 } from '../utils/validations/treinoValidation';
 
 export const treinoRegistry = new OpenAPIRegistry();
@@ -16,7 +17,7 @@ const TreinoResponse = z.object({
     descricao: z.string().nullable().openapi({ example: 'Treino focado em membros superiores' }),
     data_criacao: z.coerce.date().openapi({ example: '2026-03-17T10:00:00.000Z' }),
     deletado_em: z.coerce.date().nullable().openapi({ example: null }),
-    usuario_id: z.string().uuid().openapi({ example: '550e8400-e29b-41d4-a716-446655440000' }),
+    usuario_id: z.string().uuid().nullable().openapi({ example: '550e8400-e29b-41d4-a716-446655440000' }),
     treinador_id: z.string().uuid().nullable().openapi({ example: '550e8400-e29b-41d4-a716-446655440002' }),
     dias_semana: z
         .array(z.enum(['SEGUNDA', 'TERCA', 'QUARTA', 'QUINTA', 'SEXTA', 'SABADO', 'DOMINGO']))
@@ -90,7 +91,7 @@ treinoRegistry.registerPath({
     method: 'post',
     path: '/treinos',
     summary: 'Criar treino',
-    description: 'Cria um novo treino. Pode ser criado sem exercícios ou já com composição inicial. Aluno pode criar apenas treino próprio; treinador/admin podem criar para qualquer aluno existente. O treinador criador é vinculado automaticamente.',
+    description: 'Cria um novo treino. Pode ser criado sem exercícios ou já com composição inicial. Aluno pode criar apenas treino próprio; treinador/admin podem criar para qualquer aluno existente. Treinador também pode criar treino próprio sem aluno_id (treinador_id é inferido do autenticado ou informado pelo admin).',
     tags: ['Treino'],
     security: [{ BearerAuth: [] }],
     request: {
@@ -262,5 +263,44 @@ treinoRegistry.registerPath({
         403: { description: 'Sem permissão para excluir este treino' },
         404: { description: 'Treino não encontrado' },
         422: { description: 'ID inválido' },
+    },
+});
+
+// POST /treinos/{id}/duplicar
+treinoRegistry.registerPath({
+    method: 'post',
+    path: '/treinos/{id}/duplicar',
+    summary: 'Duplicar treino para aluno(s)',
+    description: 'Duplica um treino existente para um ou mais alunos vinculados. Mantém a estrutura de exercícios e séries, criando novos treinos para cada aluno informado.',
+    tags: ['Treino'],
+    security: [{ BearerAuth: [] }],
+    request: {
+        params: TreinoIdParam,
+        body: {
+            required: true,
+            content: {
+                'application/json': { schema: treinoDuplicarSchema },
+            },
+        },
+    },
+    responses: {
+        201: {
+            description: 'Treino(s) duplicado(s) com sucesso',
+            content: {
+                'application/json': {
+                    schema: z.object({
+                        error: z.boolean().openapi({ example: false }),
+                        code: z.number().openapi({ example: 201 }),
+                        message: z.string().nullable().openapi({ example: 'Recurso criado com sucesso' }),
+                        data: z.array(TreinoDetalhadoResponse),
+                        errors: z.array(z.any()),
+                    }),
+                },
+            },
+        },
+        401: { description: 'Não autorizado' },
+        403: { description: 'Sem permissão para duplicar este treino' },
+        404: { description: 'Treino não encontrado' },
+        422: { description: 'Erro de validação' },
     },
 });

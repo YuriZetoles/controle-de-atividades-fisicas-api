@@ -213,7 +213,7 @@ export const treino = pgTable('treino', {
     descricao: text('descricao'),
     data_criacao: timestamp('data_criacao').defaultNow().notNull(),
     deletado_em: timestamp('deletado_em'),
-    usuario_id: uuid('usuario_id').notNull().references(() => aluno.id),
+    usuario_id: uuid('usuario_id').references(() => aluno.id),
     treinador_id: uuid('treinador_id').references(() => treinador.id),
     dias_semana: diaSemanaEnum('dias_semana').array(),
     ordem: integer('ordem'),
