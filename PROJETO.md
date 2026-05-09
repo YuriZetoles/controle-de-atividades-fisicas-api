@@ -1,4 +1,4 @@
-# **PROJETO DE SOFTWARE \- ################**
+# **PROJETO DE SOFTWARE - SPOTTER**
 
 ## ***Stakeholders***
 
@@ -15,185 +15,125 @@
 | Yuri Zetoles | Desenvolvedor | yurizetoles0123@gmail.com |
 | João Kmniecik | Desenvolvedor | joao.kmniecik@estudante.ifro.edu.br |
 
-<!-- # **Sumário** -->
-
-<!-- * [RESUMO DO PROJETO](#resumo-do-projeto)  
-* [INTRODUÇÃO](#introdução)  
-  * [PROPÓSITO DESTE DOCUMENTO](#propósito-deste-documento)  
-  * [CONCEPÇÃO DO SISTEMA](#concepção-do-sistema)  
-* [DESCRIÇÃO GERAL](#descrição-geral)  
-  * [USUÁRIOS DO SISTEMA (ATORES)](#usuários-do-sistema-atores)  
-  * [ABRANGÊNCIA E SISTEMAS SIMILARES](#abrangência-e-sistemas-similares)  
-  * [SUPOSIÇÕES E DEPENDÊNCIAS](#suposições-e-dependências)  
-* [REQUISITOS DO SOFTWARE](#requisitos-do-software)  
-  * [REQUISITOS FUNCIONAIS](#requisitos-funcionais)  
-  * [REQUISITOS NÃO FUNCIONAIS](#requisitos-não-funcionais)  
-* [PROTOTIPAGEM](#prototipagem)  
-* [DIAGRAMA DE CASOS DE USO](#diagrama-de-casos-de-uso)  
-  * [DESCRIÇÃO TEXTUAL DOS CASOS DE USO](#descrição-textual-dos-casos-de-uso)  
-  * [ESPECIFICAÇÃO DOS CASOS DE USO](#especificação-dos-casos-de-uso)  
-* [DIAGRAMA DE CLASSES](#diagrama-de-classes)  
-* [DIAGRAMA DE SEQUÊNCIAS](#diagrama-de-sequências)  
-* [DIAGRAMA DE ATIVIDADES](#diagrama-de-atividades) -->
-
 # **RESUMO DO PROJETO**
 
 |  |  |
 | :---- | :---- |
 | **NOME** | Spotter |
-| **PRINCIPAL OBJETIVO** | Desenvolver um aplicativo que possibilite a boa comunicação entre personal trainer e alunos. |
-| **BENEFÍCIOS ESPERADOS** | Facilitar a comunicação entre o personal trainer e seus alunos. |
+| **PRINCIPAL OBJETIVO** | Desenvolver uma plataforma que possibilite a boa comunicação entre personal trainer e alunos, além de gerenciar rotinas de treinos. |
+| **BENEFÍCIOS ESPERADOS** | Facilitar o acompanhamento de treinos, melhorar a comunicação instrutor-aluno e centralizar informações de progresso. |
 | **INÍCIO E TÉRMINO PREVISTOS** | 10/02/2026 - 23/06/2026 |
 
 # **INTRODUÇÃO**
 
-################
+O Spotter é uma solução integrada para o gerenciamento de atividades físicas, focada na interação entre treinadores e alunos. O sistema permite que treinadores prescrevam treinos personalizados, acompanhem a evolução dos alunos e mantenham um canal de comunicação direto, enquanto os alunos podem visualizar suas rotinas, registrar a execução dos exercícios e monitorar seu próprio progresso.
 
 ## **PROPÓSITO DESTE DOCUMENTO**
 
-O objetivo deste documento é detalhar a concepção, arquitetura, requisitos e funcionalidades do sistema. Ele serve como um guia para o desenvolvimento contínuo, manutenção e para que outros possam entender o software, garantindo que as informações relevantes estejam organizadas e acessíveis.
+O objetivo deste documento é detalhar a concepção, arquitetura, requisitos e funcionalidades do sistema Spotter. Ele serve como um guia para o desenvolvimento contínuo, manutenção e para que outros possam entender o software, garantindo que as informações relevantes estejam organizadas e acessíveis.
 
 ## **CONCEPÇÃO DO SISTEMA**
 
-A ideia para o desenvolvimento do sistema partiu de uma necessidade identificada pelo nosso cliente de reunir funções existentes em outros aplicativos de organização de exercícios, como dados estatísticos de progressão, comunicação via chat, fácil organização, disposição e demonstração dos exercícios (com o objetivo de ajudar novos alunos a entender os exercícios a serem executados), organização de locais de treino bem como dados dos personal trainers, em um único aplicativo.
+A ideia para o desenvolvimento do sistema partiu de uma necessidade identificada de reunir funções existentes em outros aplicativos de organização de exercícios, como dados estatísticos de progressão, comunicação via chat, fácil organização, disposição e demonstração dos exercícios, organização de locais de treino bem como dados dos personal trainers, em um único ecossistema.
 
 # **DESCRIÇÃO GERAL**
 
-Aplicativo com objetivo de ser uma cartilha de treino para alunos e personal trainers poderem se organizar e executar rotinas de treinos de forma descomplicada, com fácil disposição das informações para que qualquer usuário, seja ele novo ou experiente em treinos de academia, consiga utilizar de forma ágil e direta.
+O Spotter é composto por uma API robusta e um aplicativo móvel. Ele serve como uma cartilha de treino digital para alunos e personal trainers, permitindo a execução de rotinas de treinos de forma descomplicada e ágil.
 
 ## **USUÁRIOS DO SISTEMA (ATORES)**
 
 | ATOR | DESCRIÇÃO |
 | :---- | :---- |
-| Instrutor/Personal Trainer | O personal trainer terá capacidade de gerenciar os treinos de seus alunos, criando, editando ou removendo (quando necessário) rotinas de treino. Acompanhar a execução e progressão dos treinos por seus alunos, bem como de enviar mensagens/notificações personalizadas ao aluno com lembretes ou informes relevantes sobre os treinos a serem executados |
-| Aluno | O aluno terá capacidade de visualizar as rotinas de treinos criadas para ele por um personal trainer mas também a possibilidade de criar uma rotina própria de treinos, bem como a de editar a rotina de treino criada pelo persona trainer. |
+| Instrutor/Personal Trainer | O personal trainer gerencia os treinos de seus alunos, criando, editando ou removendo rotinas. Acompanha a execução e progressão, e comunica-se via chat. |
+| Aluno | O aluno visualiza e executa rotinas de treinos, podendo também criar treinos próprios ou editar os sugeridos pelo treinador (ajuste de carga/séries). |
 
 ## **ABRANGÊNCIA E SISTEMAS SIMILARES**
 
-O objetivo é que qualquer individuo possa utilizar o aplicativo de forma descomplicada, bastando apenas instalar e utilizar.
-Existem diversos aplicativos com propostas semelhantes, mas com caracteristicas próprias, que facilitam por um lado, mas podem não ser tão interessantes em outros pontos. Exemplos sendo os aplicativos: **Gym Day** e **Trainiac**.
+O sistema visa abranger desde usuários iniciantes até experientes em ambientes de academia.
+Sistemas similares: **Gym Day** (foco na execução) e **Trainiac** (foco na prescrição).
 
 ## **SUPOSIÇÕES E DEPENDÊNCIAS**
 
 * **Suposições:**
-  * O usuário terá um dispositivo rodando sistema operacional Android.
-  * Acesso a internet no primeiro momento de uso ou de forma pontual para sincronização dos dados.
-  * Usuário terá acesso a academias ou aparelhos para executar seus treinos.
+  * O usuário possui um dispositivo móvel.
+  * Acesso à internet para sincronização de dados.
 * **Dependências:**
-  * **Android (Versão 7+ | SDK25+):** Sistema Operacional do dispositivo.
+  * **Backend:** Node.js 22+, PostgreSQL.
+  * **Mobile:** Desenvolvido em Kotlin/Compose Multiplatform.
 
 # **ESTUDO DE VIABILIDADE**
 
 * **Viabilidade Técnica:**
-  * As tecnologias utilizadas (Node.js, TypeScript, Express, MongoDB, Kotlin) são maduras e amplamente utilizadas, com bom suporte da comunidade.  
-  * Sistema Operacional alvo é amplamente utilizado, possui atualizações constantes com novas funcionalidades e também de segurança.
-  * A criação de APIs RESTful com Express é consolidada.
-  * A IDE Android Studio é oficial e de desenvolvimento nativo.
+  * As tecnologias utilizadas (Node.js, TypeScript, Express, PostgreSQL, Drizzle ORM, BetterAuth, Minio) são modernas, estáveis e amplamente utilizadas.
+  * A arquitetura baseada em APIs RESTful permite uma clara separação entre backend e frontend/mobile.
+  * O uso de Docker facilita a implantação e escalabilidade.
   * **Conclusão:** Tecnicamente, o projeto é viável.  
 * **Viabilidade Econômica:**
-  * **Custos de Desenvolvimento:** Tempo e mão de obra da equipe de desenvolvedores.  
-  * **Custos de Infraestrutura:** Variam conforme a hospedagem. Pode ser baixo (self-hosted, Docker, Mongo Atlas gratuito) ou aumentar com serviços pagos (AWS).  
+  * **Custos de Desenvolvimento:** Tempo e mão de obra da equipe.  
+  * **Custos de Infraestrutura:** Otimizados pelo uso de containers e softwares open-source. Pode ser hospedado em nuvens públicas ou servidores próprios.
   * **Conclusão:** É economicamente viável.
 * **Viabilidade Operacional:**
-  * Requer capacidade do usuário saber instalar aplicativos por fora (APK/Sideload)
-  * A manutenção envolve atualizações e monitoramento.
-  * **Conclusão:** É operacionalmente viável com a administração técnica adequada.  
+  * O sistema é projetado para ser intuitivo, com foco na facilidade de uso durante o treino.
+  * A manutenção é facilitada pelo uso de TypeScript e Drizzle ORM (type-safety).
+  * **Conclusão:** É operacionalmente viável.  
 * **Viabilidade Legal:**
-  * Utiliza bibliotecas com licenças permissivas (ISC, MIT, Apache).  
-  * É preciso respeitar os termos de uso do Android.
-  * Atenção à LGPD no tratamento dos dados dos usuários.  
-  * **Conclusão:** Legalmente viável, respeitando as políticas de terceiros e leis aplicáveis.
+  * Utiliza bibliotecas com licenças permissivas.  
+  * Conformidade com a LGPD no tratamento de dados sensíveis de saúde e biometria.
+  * **Conclusão:** Legalmente viável.
 
 # **METODOLOGIA ADOTADA NO DESENVOLVIMENTO**
 
-Para o desenvolvimento, a equipe de desenvolvedores optou pela metodologia ágil, utilizando de **Kanban** com definição clara de tasks e atribuições diretas a cada um.
-
-* **Visualização:** Usaremos um quadro com colunas como: Backlog, A Fazer, Em Andamento, Teste, Concluído.  
-* **Limitar WIP:** Definirei um limite de tarefas "Em Andamento" para manter o foco.  
-* **Gerenciar Fluxo:** Priorizarei as tarefas do backlog.  
-* **Melhoria Contínua:** Revisarei o processo periodicamente.
+Para o desenvolvimento, a equipe optou pela metodologia ágil, utilizando **Kanban** com definição clara de tarefas e entregas contínuas.
 
 # **REQUISITOS DO SOFTWARE**
-
-Aqui estão os requisitos funcionais e não funcionais que definem o que o aplicativo faz e como ele deve operar.
 
 ## **REQUISITOS FUNCIONAIS**
 
 | ID | NOME | DESCRIÇÃO | PRIORIDADE |
 | :---- | :---- | :---- | :---- |
-| RF001 | Cadastro de usuátio |O sistema deve permitir o cadastro de usuários | Alta |
-| RF002 | Login de usuátio |O sistema deve permitir o login de usuários | Alta |
-| RF003 | Tipos de usuários | O usuário deve poder se cadastrar como Aluno ou Treinador | Alta|
-| RF004 | informações de usuário |Cada perfil deve conter informações básicas (nome, foto, dados físicos no caso do aluno)| Alta|
-| RF005 | Demonstração de exercícios |  O sistema deve exibir os exercícios do treino com um GIF.| Alta|
-| RF006 | Mudança de treino | O aluno deve poder modificar pesos e séries durante a execução do treino | Alta|
-| RF007 | Histórico de treino | O sistema deve registrar e exibir um histórico de treinos realizados | Média |
-| RF008 | Treino próprio | O aluno deve poder criar um treino próprio sem necessidade de treinador | Alta |
-| RF009 | Treino para alunos | O treinador deve poder montar treinos para seus alunos | Alta |
-| RF0010 | Alterar treino de alunos | O treinador deve poder editar treinos já criados para um aluno | Alta |
-| RF0011 | Acompanhamento de progresso | O treinador deve ter acesso a estatísticas dos seus alunos (ex: evolução de carga, frequência)| Média |
-| RF0012 | Lista de alunos | O treinador deve poder visualizar a lista de seus alunos | Alta |
-| RF0013 | Chat de alunos |  O sistema deve disponibilizar um chat entre aluno e treinador| Alta |
-| RF0014 | Disponibilidade do chat | O chat deve ser acessível tanto pelo perfil do aluno quanto pelo do treinador| Alta |
-| RF0015 | Procurar treinador | O sistema deve permitir que ao logar pela primeira vez, o aluno pode procurar um treinador para si | Média |
-
-
-
+| RF001 | Cadastro de usuário | O sistema deve permitir o cadastro de usuários (Aluno/Treinador). | Alta |
+| RF002 | Login de usuário | O sistema deve permitir o login seguro via BetterAuth. | Alta |
+| RF003 | Perfil do Usuário | Gestão de informações básicas e fotos de perfil. | Alta |
+| RF004 | Demonstração de exercícios | Exibição de GIFs/vídeos demonstrativos para orientação. | Alta |
+| RF005 | Execução de Treino | Registro de séries, repetições e cargas em tempo real. | Alta |
+| RF006 | Histórico de treino | Registro e consulta de sessões de treino realizadas. | Alta |
+| RF007 | Treino próprio | Possibilidade do aluno criar seus próprios treinos. | Alta |
+| RF008 | Prescrição de treinos | O treinador pode criar e atribuir treinos aos seus alunos. | Alta |
+| RF009 | Gestão de Alunos | O treinador pode visualizar e gerenciar sua lista de alunos vinculados. | Alta |
+| RF010 | Chat Integrado | Comunicação direta entre aluno e treinador via chat. | Alta |
+| RF011 | Estatísticas de Progresso | Gráficos de evolução de carga e frequência de treinos. | Média |
+| RF012 | Busca de Treinador | Alunos podem buscar profissionais para acompanhamento. | Média |
+| RF013 | Gestão de Academias | Cadastro e vínculo de usuários às academias que frequentam. | Média |
 
 ## **REQUISITOS NÃO FUNCIONAIS**
 
 | ID | NOME | DESCRIÇÃO | PRIORIDADE |
 | :---- | :---- | :---- | :---- |
-| RNF001 | ################ | ################ | ################ |
-| RNF002 | ################ | ################ | ################ |
+| RNF001 | Segurança | Uso de JWT, hashing de senhas e políticas de CORS. | Alta |
+| RNF002 | Performance | Respostas da API em tempo inferior a 300ms. | Média |
+| RNF003 | Disponibilidade | Meta de 99.5% de tempo de atividade (uptime). | Alta |
+| RNF004 | Escalabilidade | Arquitetura containerizada pronta para escalonamento horizontal. | Média |
+| RNF005 | Integridade | Uso de transações de banco de dados e validações via Zod. | Alta |
 
 # **DIAGRAMA DE CASOS DE USO**
-
-<!-- ![Casos de Uso]() -->
 
 ## **DESCRIÇÃO TEXTUAL DOS CASOS DE USO**
 
 * **Personal Trainer:**  
-  * **################**: ################
+  * **Prescrever Treino**: Seleciona aluno, escolhe exercícios, define séries/repetições/descanso.
+  * **Analisar Progresso**: Visualiza histórico e gráficos de carga do aluno.
 * **Aluno:**  
-  * **################**: ################
-
-## **ESPECIFICAÇÃO DOS CASOS DE USO**
-
-### **UC-01 \- ################**
-
-| UC-01 \- ################ |  |
-| :---- | :---- |
-| **Descrição/Objetivo:** | ################ |
-| **Ator:** | ################ |
-| **Pré-condições:** | ################ |
-| **Pós-condições:** | ################ |
-| **FLUXO PRINCIPAL / BÁSICO:** | ################ |
-| **FLUXOS ALTERNATIVOS / EXCEÇÕES:** | ################ |
-
-### **UC-02 \- ################**
-
-| UC-02 \- ################ |  |
-| :---- | :---- |
-| **Descrição/Objetivo:** | ################ |
-| **Ator:** | ################ |
-| **Pré-condições:** | ################ |
-| **Pós-condições:** | ################ |
-| **FLUXO (Gerar):** | ################ |
-| **FLUXO (Listar):** | ################ |
-| **FLUXO (Revogar):** | ################ |
-| **FLUXO (Inativar/Reativar):** | ################ |
-| **FLUXO (Aprovar/Reprovar):** | ################ |
-| **FLUXOS ALTERNATIVOS:** | ################ |
+  * **Iniciar Sessão de Treino**: Seleciona o treino do dia e registra a execução de cada série.
+  * **Vincular Treinador**: Busca um profissional pelo nome ou CREF e solicita acompanhamento.
 
 # **DIAGRAMA DE CLASSES**
 
-<!-- ![Atividade Envio de Email]() -->
+*O diagrama de classes reflete a estrutura definida no schema do Drizzle, incluindo entidades como User, Aluno, Treinador, Treino, Exercicio, SessaoTreino e Conversa.*
 
 # **DIAGRAMA DE SEQUÊNCIA**
 
-<!-- ![Sequência Cadastro]() -->
+*Representa o fluxo de autenticação, prescrição de treinos e registro de sessões de exercício.*
 
 # **DIAGRAMA DE ATIVIDADES**
 
-<!-- ![Atividade]() -->
+*Fluxo de execução de um treino: Início -> Seleção de Exercício -> Registro de Séries -> Finalização -> Atualização de Histórico.*
