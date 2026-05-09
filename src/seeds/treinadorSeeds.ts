@@ -65,10 +65,14 @@ export async function seedTreinadores(academiasIds: string[]): Promise<Treinador
 
 	const treinadoresValues = [];
 	for (const seed of treinadoresSeed) {
-		const authUser = await auth.api.signUpEmail({
-			body: { name: seed.name, email: seed.email, password: seed.password },
-		});
-
+	        const authUser = await auth.api.signUpEmail({
+	                body: { 
+	                        name: seed.name, 
+	                        email: seed.email, 
+	                        password: seed.password,
+	                        tipo: "treinador"
+	                },
+	        });
 		treinadoresValues.push({
 			user_id: authUser.user.id,
 			academia_id: academiasIds[seed.academiaIndex],

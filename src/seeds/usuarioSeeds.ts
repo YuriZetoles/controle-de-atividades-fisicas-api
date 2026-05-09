@@ -94,7 +94,12 @@ export async function seedUsuarios(academiasIds: string[], treinadores: Treinado
     const alunosValues = [];
     for (const seed of alunosSeed) {
         const authUser = await auth.api.signUpEmail({
-            body: { name: seed.name, email: seed.email, password: seed.password },
+            body: { 
+                name: seed.name, 
+                email: seed.email, 
+                password: seed.password,
+                tipo: "aluno" 
+            },
         });
         const treinadorId = seed.treinadorNome
             ? treinadores.find((treinador) => treinador.nome === seed.treinadorNome)?.id
