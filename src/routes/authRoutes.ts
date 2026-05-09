@@ -16,12 +16,16 @@
 
 import express from "express";
 import { authMiddleware } from "../middlewares/authMiddleware";
+import UsuarioRepository from "../repositories/usuarioRepository";
 
 const router = express.Router();
 
 // Exemplo: rota protegida para obter dados do usuário autenticado
-router.get("/me", authMiddleware, (req, res) => {
+router.get("/me", authMiddleware, async (req, res) => {
     const user = (req as any).user;
+    const usuarioRepository = new UsuarioRepository();
+    const perfil = await usuarioRepository.buscarPerfilAcesso(user.id);
+
     res.json({
         success: true,
         data: {
@@ -29,6 +33,8 @@ router.get("/me", authMiddleware, (req, res) => {
             name: user.name,
             email: user.email,
             image: user.image,
+            type_usuario_autenticado: perfil.isTreinador ? "treinador" : "aluno",
+            isAdmin: perfil.isAdmin,
         },
     });
 });
