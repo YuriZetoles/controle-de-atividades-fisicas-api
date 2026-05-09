@@ -14,6 +14,7 @@
 | Aluno cria treino para si mesmo (sem `aluno_id`) | Deve criar treino com `usuario_id` do aluno autenticado e retornar `201`. | Fazer `POST /treinos` como aluno com `{ nome: "Treino A" }` sem `aluno_id`. | Retorna `201`; `usuario_id` igual ao ID do aluno autenticado. |
 | Aluno cria treino informando o próprio `aluno_id` | Deve criar treino com `201`. | Fazer `POST /treinos` como aluno com `aluno_id` igual ao próprio ID. | Retorna `201`; `usuario_id` igual ao informado. |
 | Treinador cria treino para aluno atribuído | Deve criar treino com `201` e `treinador_id` auto-preenchido. | Fazer `POST /treinos` como treinador com `aluno_id` de aluno existente. | Retorna `201`; `treinador_id` preenchido com o ID do treinador autenticado. |
+| Treinador cria treino para si mesmo | Deve criar treino com `201` e `usuario_id: null`. | Fazer `POST /treinos` como treinador com `{ nome, treinador_id: {ID_TREINADOR} }`. | Retorna `201`; `treinador_id` igual ao autenticado e `usuario_id: null`. |
 | Admin cria treino para qualquer aluno | Deve criar treino com `201`. | Fazer `POST /treinos` como admin com qualquer `aluno_id`. | Retorna `201`; treino com `usuario_id` do aluno informado. |
 | Treino criado com exercícios na composição inicial | Deve criar treino com exercícios vinculados e retornar `201`. | Fazer `POST /treinos` com array `exercicios` contendo 2 itens. | Retorna `201`; resposta contém `exercicios` com 2 itens, cada um com `series`, `repeticoes`, `tempo_descanso_segundos`, `ordem_execucao` e dados do exercício. |
 | Treino criado sem exercícios | Deve criar treino vazio com `201`. | Fazer `POST /treinos` sem campo `exercicios`. | Retorna `201`; `exercicios` é array vazio. |
@@ -26,7 +27,6 @@
 | **Cenários tristes** |  |  |  |
 | Aluno tenta criar treino para outro aluno | Deve rejeitar com `403`. | Fazer `POST /treinos` como aluno com `aluno_id` de outro aluno. | Retorna `403`; mensagem: "aluno só pode criar treino para si mesmo". |
 | Usuário sem perfil tenta criar treino | Deve rejeitar com `403`. | Fazer `POST /treinos` como usuário sem perfil aluno/treinador/admin. | Retorna `403`; mensagem: "usuário sem perfil para criar treinos". |
-| Treinador sem `aluno_id` e sem perfil de aluno | Deve rejeitar com `422`. | Fazer `POST /treinos` como treinador puro sem `aluno_id`. | Retorna `422`; mensagem: "aluno_id é obrigatório para este perfil". |
 | `aluno_id` de aluno inexistente | Deve rejeitar com `404`. | Fazer `POST /treinos` com UUID válido mas inexistente em `aluno_id`. | Retorna `404`; mensagem: "Aluno não encontrado". |
 | Exercício inexistente na composição | Deve rejeitar com `422`. | Fazer `POST /treinos` com `exercicio_id` UUID válido mas inexistente. | Retorna `422`; mensagem: "um ou mais exercícios informados não existem". |
 | Exercício soft-deleted na composição | Deve rejeitar com `422`. | Fazer `POST /treinos` com exercício desativado. | Retorna `422`; mensagem: "não é permitido adicionar exercício inativo ao treino". |

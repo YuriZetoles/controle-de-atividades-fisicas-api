@@ -88,6 +88,14 @@ const treinoSchema = z.object({
         .uuid({ message: 'O ID do aluno deve ser um UUID válido' })
         .optional()
         .openapi({ description: 'UUID do aluno dono do treino', example: '550e8400-e29b-41d4-a716-446655440000' }),
+    treinador_id: z
+        .string()
+        .uuid({ message: 'treinador_id deve ser um UUID válido' })
+        .optional()
+        .openapi({
+            description: 'UUID do treinador dono do treino (para treinos sem aluno)',
+            example: '550e8400-e29b-41d4-a716-446655440002',
+        }),
     dias_semana: z
         .array(diasSemanaEnum)
         .nullable()
@@ -105,6 +113,14 @@ const treinoSchema = z.object({
         .optional()
         .openapi({ description: 'Composição inicial do treino' }),
 }).strict().superRefine((dados, ctx) => {
+    if (dados.aluno_id && dados.treinador_id) {
+        ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ['treinador_id'],
+            message: 'Informe apenas um entre aluno_id e treinador_id',
+        });
+    }
+
     if (dados.exercicios && dados.exercicios.length > 0) {
         const ordens = dados.exercicios.map((item) => item.ordem_execucao);
         const ordensDuplicadas = ordens.filter((ordem, idx) => ordens.indexOf(ordem) !== idx);
@@ -473,7 +489,35 @@ const treinoDeleteQuerySchema = z.object({
         }),
 }).strict().openapi('TreinoDeleteQuery');
 
+const treinoDuplicarSchema = z.object({
+    aluno_id: z
+        .string()
+        .uuid({ message: 'aluno_id deve ser um UUID válido' })
+        .optional()
+        .openapi({ description: 'UUID do aluno de destino', example: '550e8400-e29b-41d4-a716-446655440000' }),
+    aluno_ids: z
+        .array(z.string().uuid({ message: 'Cada item de aluno_ids deve ser um UUID válido' }))
+        .min(1, { message: 'aluno_ids deve conter ao menos 1 item' })
+        .optional()
+        .openapi({ description: 'Lista de UUIDs de alunos de destino', example: ['550e8400-e29b-41d4-a716-446655440000'] }),
+}).strict()
+    .refine((dados) => Boolean(dados.aluno_id || dados.aluno_ids?.length), {
+        message: 'Informe aluno_id ou aluno_ids',
+    })
+    .refine((dados) => !(dados.aluno_id && dados.aluno_ids), {
+        message: 'Informe apenas um entre aluno_id e aluno_ids',
+    })
+    .openapi('TreinoDuplicarInput');
+
 type TreinoDeleteQuery = z.infer<typeof treinoDeleteQuerySchema>;
 
-export { treinoSchema, treinoUpdateSchema, treinoIdSchema, treinoDetalheQuerySchema, treinoListQuerySchema, treinoDeleteQuerySchema };
+export {
+    treinoSchema,
+    treinoUpdateSchema,
+    treinoIdSchema,
+    treinoDetalheQuerySchema,
+    treinoListQuerySchema,
+    treinoDeleteQuerySchema,
+    treinoDuplicarSchema,
+};
 export type { TreinoDetalheQuery, TreinoListQuery, TreinoDeleteQuery };
