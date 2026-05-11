@@ -115,7 +115,7 @@ export type type_treino = {
     descricao?: string | null;
     data_criacao?: Date;
     deletado_em?: Date | null;
-    usuario_id: string;
+    usuario_id: string | null;
     treinador_id: string | null;
     dias_semana?: enum_dia_semana[] | null;
     ordem?: number | null;

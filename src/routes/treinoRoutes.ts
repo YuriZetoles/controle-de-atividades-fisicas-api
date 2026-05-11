@@ -6,6 +6,7 @@ const router = express.Router();
 const treinoController = new TreinoController();
 
 router.post('/treinos', authMiddleware, treinoController.createTreino);
+router.post('/treinos/:id/duplicar', authMiddleware, treinoController.duplicarTreinoParaAlunos);
 router.get('/treinos', authMiddleware, treinoController.getAllTreinos);
 router.get('/treinos/:id', authMiddleware, treinoController.getTreinoById);
 router.patch('/treinos/:id', authMiddleware, treinoController.updateTreino);
