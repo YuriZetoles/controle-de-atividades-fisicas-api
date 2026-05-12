@@ -1,12 +1,18 @@
+// Helper para evitar TS2345 "not assignable to parameter of type never"
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function mockFn() {
+  return jest.fn() as jest.MockedFunction<(...args: any[]) => any>;
+}
+
 jest.mock('../../middlewares/authMiddleware', () => ({
-    authMiddleware: jest.fn(),
+    authMiddleware: mockFn(),
 }));
 jest.mock('../../middlewares/adminMiddleware', () => ({
     adminMiddleware: jest.fn((_req: any, _res: any, next: any) => next()),
 }));
 jest.mock('../../services/uploadService', () => ({
     __esModule: true,
-    default: jest.fn().mockImplementation(() => ({
+    default: mockFn().mockImplementation(() => ({
         uploadFiles: jest.fn<() => Promise<{ url: string }[]>>().mockResolvedValue([{ url: 'http://test-s3.local/animacoes/test.gif' }]),
         deleteFile: jest.fn<() => Promise<void>>().mockResolvedValue(),
     })),
@@ -15,7 +21,7 @@ jest.mock('../../services/uploadService', () => ({
 import { randomUUID } from 'crypto';
 import express from 'express';
 import request from 'supertest';
-import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from '@jest/globals';
+import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, jest } from '@jest/globals';
 import exercicioRoutes from '../../routes/exercicioRoutes';
 import { globalErrorHandler } from '../../middlewares/globalErrorHandler';
 import { DbConnect, DataBase } from '../../config/DbConnect';
@@ -846,13 +852,20 @@ describe('GET /exercicios', () => {
 
     it('filtro em_uso=true → 200 somente exercícios vinculados a treinos', async () => {
         asAdmin();
-        const res = await request(app).get('/api/exercicios?escopo=GLOBAL&em_uso=true');
+        const res = await request(app).get(`/api/exercicios?escopo=GLOBAL&em_uso=true&nome=${encodeURIComponent(RUN_ID)}&limite=100`);
 
         expect(res.status).toBe(200);
         const ids = res.body.data.dados.map((e: any) => e.id);
+        expect(ids.length).toBeGreaterThan(0);
         expect(ids).toContain(exGlobal1Id);
         // exGlobal2Id não tem treino_exercicio
         expect(ids).not.toContain(exGlobal2Id);
+
+        const usados = await DataBase
+            .select({ id: treino_exercicio.exercicio_id })
+            .from(treino_exercicio)
+            .where(inArray(treino_exercicio.exercicio_id, ids));
+        expect(usados.length).toBe(ids.length);
     });
 
     it('filtro em_uso=false → 200 somente exercícios sem treino vinculado', async () => {

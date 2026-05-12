@@ -208,18 +208,19 @@ class AlunoController {
       );
     }
 
-    if (error instanceof DatabaseError) {
+    if (error instanceof DatabaseError || (error as any)?.name === 'DatabaseError') {
+      const dbError = error as DatabaseError;
       console.warn(
         `[AlunoController] [${context}] DatabaseError:`,
-        error.message,
+        dbError.message,
       );
       return CommonResponse.error(
         res,
-        error.statusCode,
+        dbError.statusCode || 500,
         null,
         null,
-        [error.toJSON()],
-        error.message,
+        [dbError.toJSON()],
+        dbError.message,
       );
     }
 
