@@ -5,7 +5,8 @@ jest.mock('../../middlewares/authMiddleware', () => ({
 import { randomUUID } from 'crypto';
 import express from 'express';
 import request from 'supertest';
-import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from '@jest/globals';
+import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, jest } from '@jest/globals';
+import { ZodError } from 'zod';
 import historicoRoutes from '../../routes/historicoRoutes';
 import { DbConnect, DataBase } from '../../config/DbConnect';
 import { authMiddleware } from '../../middlewares/authMiddleware';
@@ -24,6 +25,8 @@ import {
     user,
 } from '../../config/db/schema';
 import { eq, inArray, and } from 'drizzle-orm';
+import HistoricoController from '../../controllers/historicoController';
+import { DatabaseError } from '../../utils/errors/DatabaseError';
 
 // Estado global
 
@@ -251,7 +254,9 @@ beforeAll(async () => {
     await DataBase.insert(user).values({ id: adminUserId, name: 'Admin HT', email: `admin_ht_${RUN_ID}@test.local`, emailVerified: false, createdAt: now, updatedAt: now });
     const [adminRec] = await DataBase.insert(treinador).values({
         user_id: adminUserId, nome: 'Admin HT', data_nascimento: '1980-01-01', sexo: 'M',
-        cref: `ADM_HT_${RUN_ID}`.substring(0, 50), turnos: ['MANHA'], especializacao: 'Administração',
+        cref: `ADM_HT_${RUN_ID}`.substring(0, 50), turnos: ['MANHA'],
+        especializacao: 'Geral',
+        graduacao: 'Graduado', especializacao: 'Administração',
         graduacao: 'Educação Física', is_admin: true, academia_id: academiaId,
     }).returning({ id: treinador.id });
     adminTreinadorId = adminRec.id;
@@ -288,7 +293,9 @@ beforeAll(async () => {
     await DataBase.insert(user).values({ id: treinadorUserId, name: 'Treinador1 HT', email: `tr1_ht_${RUN_ID}@test.local`, emailVerified: false, createdAt: now, updatedAt: now });
     const [tr1Rec] = await DataBase.insert(treinador).values({
         user_id: treinadorUserId, nome: 'Treinador1 HT', data_nascimento: '1985-03-15', sexo: 'M',
-        cref: `TR1_HT_${RUN_ID}`.substring(0, 50), turnos: ['TARDE'], especializacao: 'Musculação',
+        cref: `TR1_HT_${RUN_ID}`.substring(0, 50), turnos: ['TARDE'],
+        especializacao: 'Geral',
+        graduacao: 'Graduado', especializacao: 'Musculação',
         graduacao: 'Educação Física', is_admin: false, academia_id: academiaId,
     }).returning({ id: treinador.id });
     treinadorRecId = tr1Rec.id;
@@ -301,7 +308,9 @@ beforeAll(async () => {
     await DataBase.insert(user).values({ id: treinador2UserId, name: 'Treinador2 HT', email: `tr2_ht_${RUN_ID}@test.local`, emailVerified: false, createdAt: now, updatedAt: now });
     const [tr2Rec] = await DataBase.insert(treinador).values({
         user_id: treinador2UserId, nome: 'Treinador2 HT', data_nascimento: '1988-06-20', sexo: 'F',
-        cref: `TR2_HT_${RUN_ID}`.substring(0, 50), turnos: ['NOITE'], especializacao: 'Yoga',
+        cref: `TR2_HT_${RUN_ID}`.substring(0, 50), turnos: ['NOITE'],
+        especializacao: 'Geral',
+        graduacao: 'Graduado', especializacao: 'Yoga',
         graduacao: 'Educação Física', is_admin: false, academia_id: academiaId,
     }).returning({ id: treinador.id });
     treinador2RecId = tr2Rec.id;
@@ -1887,5 +1896,108 @@ describe('Histórico com exercícios TEMPO/DISTANCIA', () => {
         asAluno();
         const res = await request(app).get(`/api/historico/recordes/${NOT_FOUND_UUID}`);
         expect(res.status).toBe(404);
+    });
+});
+
+// ============================================================
+// BLOCO 2 — Testes unitários do HistoricoController (mocked)
+// ============================================================
+
+const makeRes = () => {
+    const res = {
+        status: jest.fn().mockReturnThis(),
+        json: jest.fn(),
+    };
+    return res as any;
+};
+
+const makeReq = (overrides: Record<string, unknown> = {}) => ({
+    params: { exercicioId: 'id' },
+    query: {},
+    user: { id: 'user-id' },
+    ...overrides,
+}) as any;
+
+describe('HistoricoController', () => {
+    let controller: HistoricoController;
+
+    beforeEach(() => {
+        controller = new HistoricoController();
+    });
+
+    it('getEstatisticas handles ZodError and forbidden error', async () => {
+        const res = makeRes();
+        const req = makeReq();
+        (controller as any).service = {
+            getEstatisticas: jest.fn()
+                .mockRejectedValueOnce(new ZodError([]))
+                .mockRejectedValueOnce(new Error('FORBIDDEN: denied')),
+        };
+
+        await controller.getEstatisticas(req, res);
+        await controller.getEstatisticas(req, res);
+
+        expect(res.status).toHaveBeenCalledWith(422);
+        expect(res.status).toHaveBeenCalledWith(403);
+    });
+
+    it('getProgressao handles DatabaseError and unprocessable error', async () => {
+        const res = makeRes();
+        const req = makeReq();
+        (controller as any).service = {
+            getProgressao: jest.fn()
+                .mockRejectedValueOnce(new DatabaseError('db error', 409))
+                .mockRejectedValueOnce(new Error('UNPROCESSABLE: bad input')),
+        };
+
+        await controller.getProgressao(req, res);
+        await controller.getProgressao(req, res);
+
+        expect(res.status).toHaveBeenCalledWith(409);
+        expect(res.status).toHaveBeenCalledWith(422);
+    });
+
+    it('getGruposMusculares handles unknown error', async () => {
+        const res = makeRes();
+        const req = makeReq();
+        (controller as any).service = {
+            getGruposMusculares: jest.fn().mockRejectedValue(new Error('boom')),
+        };
+
+        await controller.getGruposMusculares(req, res);
+        expect(res.status).toHaveBeenCalledWith(500);
+    });
+
+    it('getExerciciosFrequentes handles ZodError', async () => {
+        const res = makeRes();
+        const req = makeReq();
+        (controller as any).service = {
+            getExerciciosFrequentes: jest.fn().mockRejectedValue(new ZodError([])),
+        };
+
+        await controller.getExerciciosFrequentes(req, res);
+        expect(res.status).toHaveBeenCalledWith(422);
+    });
+
+    it('getRecordeExercicio handles not found error', async () => {
+        const res = makeRes();
+        const req = makeReq();
+        (controller as any).service = {
+            getRecordeExercicio: jest.fn().mockRejectedValue(new Error('Exercício não encontrado')),
+        };
+
+        await controller.getRecordeExercicio(req, res);
+        expect(res.status).toHaveBeenCalledWith(404);
+    });
+
+    it('getComparativo handles DatabaseError', async () => {
+        const res = makeRes();
+        const req = makeReq();
+        (controller as any).service = {
+            getComparativo: jest.fn().mockRejectedValue(new DatabaseError('db error', 400)),
+        };
+
+        await controller.getComparativo(req, res);
+        expect(res.status).toHaveBeenCalledWith(400);
     });
 });

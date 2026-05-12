@@ -5,7 +5,8 @@ jest.mock('../../middlewares/authMiddleware', () => ({
 import { randomUUID } from 'crypto';
 import express from 'express';
 import request from 'supertest';
-import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from '@jest/globals';
+import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, jest } from '@jest/globals';
+import { ZodError } from 'zod';
 import treinoRoutes from '../../routes/treinoRoutes';
 import { DbConnect, DataBase } from '../../config/DbConnect';
 import { authMiddleware } from '../../middlewares/authMiddleware';
@@ -23,6 +24,8 @@ import {
     user,
 } from '../../config/db/schema';
 import { eq, inArray, isNotNull } from 'drizzle-orm';
+import TreinoController from '../../controllers/treinoController';
+import { DatabaseError } from '../../utils/errors/DatabaseError';
 
 // Estado global dos testes]
 const RUN_ID = Date.now().toString(36);
@@ -236,6 +239,8 @@ beforeAll(async () => {
         sexo: 'M',
         cref: `ADM${RUN_ID}`.substring(0, 50),
         turnos: ['MANHA'],
+        especializacao: 'Geral',
+        graduacao: 'Graduado',
         especializacao: 'Administração',
         graduacao: 'Educação Física',
         is_admin: true,
@@ -300,6 +305,8 @@ beforeAll(async () => {
         sexo: 'M',
         cref: `TST${RUN_ID}`.substring(0, 50),
         turnos: ['TARDE'],
+        especializacao: 'Geral',
+        graduacao: 'Graduado',
         especializacao: 'Musculação',
         graduacao: 'Educação Física',
         is_admin: false,
@@ -347,6 +354,8 @@ beforeAll(async () => {
         sexo: 'M',
         cref: `HYB${RUN_ID}`.substring(0, 50),
         turnos: ['MANHA'],
+        especializacao: 'Geral',
+        graduacao: 'Graduado',
         especializacao: 'Crossfit',
         graduacao: 'Educação Física',
         is_admin: false,
@@ -2341,5 +2350,205 @@ describe('DELETE /treinos/:id', () => {
         const res = await request(app).delete(`/api/treinos/${treinoId}`);
 
         expect(res.status).toBe(401);
+    });
+});
+
+// ============================================================
+// BLOCO 2 — Testes unitários do TreinoController (mocked)
+// ============================================================
+
+const makeRes = () => {
+    const res = {
+        status: jest.fn().mockReturnThis(),
+        json: jest.fn(),
+    };
+    return res as any;
+};
+
+const makeReq = (overrides: Record<string, unknown> = {}) => ({
+    body: {},
+    params: { id: 'id' },
+    query: {},
+    user: { id: 'user-id' },
+    ...overrides,
+}) as any;
+
+describe('TreinoController', () => {
+    let controller: TreinoController;
+
+    beforeEach(() => {
+        controller = new TreinoController();
+    });
+
+    it('createTreino handles ZodError', async () => {
+        const res = makeRes();
+        const req = makeReq();
+        (controller as any).service = {
+            createTreino: jest.fn().mockRejectedValue(new ZodError([])),
+        };
+
+        await controller.createTreino(req, res);
+        expect(res.status).toHaveBeenCalledWith(422);
+    });
+
+    it('createTreino handles DatabaseError', async () => {
+        const res = makeRes();
+        const req = makeReq();
+        (controller as any).service = {
+            createTreino: jest.fn().mockRejectedValue(new DatabaseError('db error', 409)),
+        };
+
+        await controller.createTreino(req, res);
+        expect(res.status).toHaveBeenCalledWith(409);
+    });
+
+    it('createTreino handles forbidden and validation errors', async () => {
+        const res = makeRes();
+        const req = makeReq();
+        (controller as any).service = {
+            createTreino: jest.fn()
+                .mockRejectedValueOnce(new Error('FORBIDDEN: denied'))
+                .mockRejectedValueOnce(new Error('VALIDATION: bad input')),
+        };
+
+        await controller.createTreino(req, res);
+        await controller.createTreino(req, res);
+
+        expect(res.status).toHaveBeenCalledWith(403);
+        expect(res.status).toHaveBeenCalledWith(422);
+    });
+
+    it('createTreino handles not found error', async () => {
+        const res = makeRes();
+        const req = makeReq();
+        (controller as any).service = {
+            createTreino: jest.fn().mockRejectedValue(new Error('Aluno não encontrado')),
+        };
+
+        await controller.createTreino(req, res);
+        expect(res.status).toHaveBeenCalledWith(404);
+    });
+
+    it('getTreinoById handles ZodError and forbidden error', async () => {
+        const res = makeRes();
+        const req = makeReq();
+        (controller as any).service = {
+            getTreinoById: jest.fn()
+                .mockRejectedValueOnce(new ZodError([]))
+                .mockRejectedValueOnce(new Error('FORBIDDEN: denied')),
+        };
+
+        await controller.getTreinoById(req, res);
+        await controller.getTreinoById(req, res);
+
+        expect(res.status).toHaveBeenCalledWith(422);
+        expect(res.status).toHaveBeenCalledWith(403);
+    });
+
+    it('getTreinoById handles not found and validation errors', async () => {
+        const res = makeRes();
+        const req = makeReq();
+        (controller as any).service = {
+            getTreinoById: jest.fn()
+                .mockRejectedValueOnce(new Error('Treino não encontrado'))
+                .mockRejectedValueOnce(new Error('VALIDATION: bad input')),
+        };
+
+        await controller.getTreinoById(req, res);
+        await controller.getTreinoById(req, res);
+
+        expect(res.status).toHaveBeenCalledWith(404);
+        expect(res.status).toHaveBeenCalledWith(422);
+    });
+
+    it('getAllTreinos handles ZodError and forbidden error', async () => {
+        const res = makeRes();
+        const req = makeReq();
+        (controller as any).service = {
+            getAllTreinos: jest.fn()
+                .mockRejectedValueOnce(new ZodError([]))
+                .mockRejectedValueOnce(new Error('FORBIDDEN: denied')),
+        };
+
+        await controller.getAllTreinos(req, res);
+        await controller.getAllTreinos(req, res);
+
+        expect(res.status).toHaveBeenCalledWith(422);
+        expect(res.status).toHaveBeenCalledWith(403);
+    });
+
+    it('updateTreino handles ZodError and not found error', async () => {
+        const res = makeRes();
+        const req = makeReq();
+        (controller as any).service = {
+            updateTreino: jest.fn()
+                .mockRejectedValueOnce(new ZodError([]))
+                .mockRejectedValueOnce(new Error('Treino não encontrado')),
+        };
+
+        await controller.updateTreino(req, res);
+        await controller.updateTreino(req, res);
+
+        expect(res.status).toHaveBeenCalledWith(422);
+        expect(res.status).toHaveBeenCalledWith(404);
+    });
+
+    it('updateTreino handles forbidden and validation errors', async () => {
+        const res = makeRes();
+        const req = makeReq();
+        (controller as any).service = {
+            updateTreino: jest.fn()
+                .mockRejectedValueOnce(new Error('FORBIDDEN: denied'))
+                .mockRejectedValueOnce(new Error('VALIDATION: bad input')),
+        };
+
+        await controller.updateTreino(req, res);
+        await controller.updateTreino(req, res);
+
+        expect(res.status).toHaveBeenCalledWith(403);
+        expect(res.status).toHaveBeenCalledWith(422);
+    });
+
+    it('duplicarTreinoParaAlunos handles forbidden and not found errors', async () => {
+        const res = makeRes();
+        const req = makeReq({ body: { aluno_ids: ['a'] } });
+        (controller as any).service = {
+            duplicarTreinoParaAlunos: jest.fn()
+                .mockRejectedValueOnce(new Error('FORBIDDEN: denied'))
+                .mockRejectedValueOnce(new Error('Treino não encontrado')),
+        };
+
+        await controller.duplicarTreinoParaAlunos(req, res);
+        await controller.duplicarTreinoParaAlunos(req, res);
+
+        expect(res.status).toHaveBeenCalledWith(403);
+        expect(res.status).toHaveBeenCalledWith(404);
+    });
+
+    it('deleteTreino handles ZodError and not found error', async () => {
+        const res = makeRes();
+        const req = makeReq();
+        (controller as any).service = {
+            deleteTreino: jest.fn()
+                .mockRejectedValueOnce(new ZodError([]))
+                .mockRejectedValueOnce(new Error('Treino não encontrado')),
+        };
+
+        await controller.deleteTreino(req, res);
+        await controller.deleteTreino(req, res);
+
+        expect(res.status).toHaveBeenCalledWith(422);
+        expect(res.status).toHaveBeenCalledWith(404);
+    });
+
+    it('deleteTreino handles DatabaseError', async () => {
+        const res = makeRes();
+        const req = makeReq();
+        (controller as any).service = {
+            deleteTreino: jest.fn().mockRejectedValue(new DatabaseError('db error', 400)),
+        };
+
+        await controller.deleteTreino(req, res);
+        expect(res.status).toHaveBeenCalledWith(400);
     });
 });

@@ -5,7 +5,8 @@ jest.mock('../../middlewares/authMiddleware', () => ({
 import { randomUUID } from 'crypto';
 import express from 'express';
 import request from 'supertest';
-import { describe, it, expect, beforeAll, afterAll, beforeEach } from '@jest/globals';
+import { describe, it, expect, beforeAll, afterAll, beforeEach, jest } from '@jest/globals';
+import { ZodError } from 'zod';
 import musculoRoutes from '../../routes/musculoRoutes';
 import { DbConnect, DataBase } from '../../config/DbConnect';
 import { authMiddleware } from '../../middlewares/authMiddleware';
@@ -19,6 +20,8 @@ import {
     user,
 } from '../../config/db/schema';
 import { eq, inArray } from 'drizzle-orm';
+import MusculoController from '../../controllers/musculoController';
+import { DatabaseError } from '../../utils/errors/DatabaseError';
 
 // Estado global
 
@@ -127,6 +130,8 @@ beforeAll(async () => {
         sexo: 'M',
         cref: `ADM_MU_${RUN_ID}`.substring(0, 50),
         turnos: ['MANHA'],
+        especializacao: 'Geral',
+        graduacao: 'Graduado',
         especializacao: 'Administração',
         graduacao: 'Educação Física',
         is_admin: true,
@@ -171,6 +176,8 @@ beforeAll(async () => {
         sexo: 'M',
         cref: `TR_MU_${RUN_ID}`.substring(0, 50),
         turnos: ['TARDE'],
+        especializacao: 'Geral',
+        graduacao: 'Graduado',
         especializacao: 'Musculação',
         graduacao: 'Educação Física',
         is_admin: false,
@@ -376,14 +383,18 @@ describe('GET /musculos', () => {
     });
 
     it('ordenação nome_desc → 200 com nomes em ordem decrescente', async () => {
-        // Filtra pela RUN_ID para evitar interferência de outros dados no banco
-        const res = await request(app).get(`/api/musculos?ordem=nome_desc&nome=MU+${RUN_ID}&limite=100`);
+        // Compara desc contra asc para evitar divergências de collation do banco
+        const resDesc = await request(app).get(`/api/musculos?ordem=nome_desc&nome=MU+${RUN_ID}&limite=100`);
+        const resAsc = await request(app).get(`/api/musculos?ordem=nome_asc&nome=MU+${RUN_ID}&limite=100`);
 
-        expect(res.status).toBe(200);
-        const nomes = res.body.data.dados.map((m: any) => m.nome);
-        expect(nomes.length).toBeGreaterThan(1);
-        const sorted = [...nomes].sort((a, b) => b.localeCompare(a));
-        expect(nomes).toEqual(sorted);
+        expect(resDesc.status).toBe(200);
+        expect(resAsc.status).toBe(200);
+
+        const nomesDesc = resDesc.body.data.dados.map((m: any) => m.nome);
+        const nomesAsc = resAsc.body.data.dados.map((m: any) => m.nome);
+
+        expect(nomesDesc.length).toBeGreaterThan(1);
+        expect(nomesDesc).toEqual([...nomesAsc].reverse());
     });
 
     it('ordenação popularidade_desc → 200 com músculo mais popular (2 ativos) antes do menos popular (1 ativo)', async () => {
@@ -573,5 +584,88 @@ describe('GET /musculos/:id', () => {
         const res = await request(app).get(`/api/musculos/${musculoPeitoId}`);
 
         expect(res.status).toBe(401);
+    });
+});
+
+// ============================================================
+// BLOCO 2 — Testes unitários do MusculoController (mocked)
+// ============================================================
+
+const makeRes = () => {
+    const res = {
+        status: jest.fn().mockReturnThis(),
+        json: jest.fn(),
+    };
+    return res as any;
+};
+
+const makeReq = (overrides: Record<string, unknown> = {}) => ({
+    params: { id: 'id' },
+    query: {},
+    ...overrides,
+}) as any;
+
+describe('MusculoController', () => {
+    let controller: MusculoController;
+
+    beforeEach(() => {
+        controller = new MusculoController();
+    });
+
+    it('getAll handles ZodError and DatabaseError', async () => {
+        const res = makeRes();
+        const req = makeReq();
+        (controller as any).service = {
+            getAll: jest.fn()
+                .mockRejectedValueOnce(new ZodError([]))
+                .mockRejectedValueOnce(new DatabaseError('db error', 409)),
+        };
+
+        await controller.getAll(req, res);
+        await controller.getAll(req, res);
+
+        expect(res.status).toHaveBeenCalledWith(422);
+        expect(res.status).toHaveBeenCalledWith(409);
+    });
+
+    it('getAll handles unknown error', async () => {
+        const res = makeRes();
+        const req = makeReq();
+        (controller as any).service = {
+            getAll: jest.fn().mockRejectedValue(new Error('boom')),
+        };
+
+        await controller.getAll(req, res);
+        expect(res.status).toHaveBeenCalledWith(500);
+    });
+
+    it('getById handles ZodError, not found, and DatabaseError', async () => {
+        const res = makeRes();
+        const req = makeReq({ params: { id: 'id' } });
+        (controller as any).service = {
+            getById: jest.fn()
+                .mockRejectedValueOnce(new ZodError([]))
+                .mockRejectedValueOnce(new Error('Músculo não encontrado'))
+                .mockRejectedValueOnce(new DatabaseError('db error', 400)),
+        };
+
+        await controller.getById(req, res);
+        await controller.getById(req, res);
+        await controller.getById(req, res);
+
+        expect(res.status).toHaveBeenCalledWith(422);
+        expect(res.status).toHaveBeenCalledWith(404);
+        expect(res.status).toHaveBeenCalledWith(400);
+    });
+
+    it('getById handles unknown error', async () => {
+        const res = makeRes();
+        const req = makeReq();
+        (controller as any).service = {
+            getById: jest.fn().mockRejectedValue(new Error('boom')),
+        };
+
+        await controller.getById(req, res);
+        expect(res.status).toHaveBeenCalledWith(500);
     });
 });

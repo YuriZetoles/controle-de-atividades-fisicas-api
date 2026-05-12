@@ -5,7 +5,8 @@ jest.mock('../../middlewares/authMiddleware', () => ({
 import { randomUUID } from 'crypto';
 import express from 'express';
 import request from 'supertest';
-import { describe, it, expect, beforeAll, afterAll, beforeEach } from '@jest/globals';
+import { describe, it, expect, beforeAll, afterAll, beforeEach, jest } from '@jest/globals';
+import { ZodError } from 'zod';
 import aparelhoRoutes from '../../routes/aparelhoRoutes';
 import { DbConnect, DataBase } from '../../config/DbConnect';
 import { authMiddleware } from '../../middlewares/authMiddleware';
@@ -19,6 +20,8 @@ import {
     user,
 } from '../../config/db/schema';
 import { eq, inArray } from 'drizzle-orm';
+import AparelhoController from '../../controllers/aparelhoController';
+import { DatabaseError } from '../../utils/errors/DatabaseError';
 
 // Estado global
 
@@ -126,6 +129,8 @@ beforeAll(async () => {
         sexo: 'M',
         cref: `ADM_AP_${RUN_ID}`.substring(0, 50),
         turnos: ['MANHA'],
+        especializacao: 'Geral',
+        graduacao: 'Graduado',
         especializacao: 'Administração',
         graduacao: 'Educação Física',
         is_admin: true,
@@ -170,6 +175,8 @@ beforeAll(async () => {
         sexo: 'M',
         cref: `TR_AP_${RUN_ID}`.substring(0, 50),
         turnos: ['TARDE'],
+        especializacao: 'Geral',
+        graduacao: 'Graduado',
         especializacao: 'Musculação',
         graduacao: 'Educação Física',
         is_admin: false,
@@ -478,5 +485,88 @@ describe('GET /aparelhos/:id', () => {
         const res = await request(app).get(`/api/aparelhos/${aparelhoAId}`);
 
         expect(res.status).toBe(401);
+    });
+});
+
+// ============================================================
+// BLOCO 2 — Testes unitários do AparelhoController (mocked)
+// ============================================================
+
+const makeRes = () => {
+    const res = {
+        status: jest.fn().mockReturnThis(),
+        json: jest.fn(),
+    };
+    return res as any;
+};
+
+const makeReq = (overrides: Record<string, unknown> = {}) => ({
+    params: { id: 'id' },
+    query: {},
+    ...overrides,
+}) as any;
+
+describe('AparelhoController', () => {
+    let controller: AparelhoController;
+
+    beforeEach(() => {
+        controller = new AparelhoController();
+    });
+
+    it('getAll handles ZodError and DatabaseError', async () => {
+        const res = makeRes();
+        const req = makeReq();
+        (controller as any).service = {
+            getAll: jest.fn()
+                .mockRejectedValueOnce(new ZodError([]))
+                .mockRejectedValueOnce(new DatabaseError('db error', 409)),
+        };
+
+        await controller.getAll(req, res);
+        await controller.getAll(req, res);
+
+        expect(res.status).toHaveBeenCalledWith(422);
+        expect(res.status).toHaveBeenCalledWith(409);
+    });
+
+    it('getAll handles unknown error', async () => {
+        const res = makeRes();
+        const req = makeReq();
+        (controller as any).service = {
+            getAll: jest.fn().mockRejectedValue(new Error('boom')),
+        };
+
+        await controller.getAll(req, res);
+        expect(res.status).toHaveBeenCalledWith(500);
+    });
+
+    it('getById handles ZodError, not found, and DatabaseError', async () => {
+        const res = makeRes();
+        const req = makeReq({ params: { id: 'id' } });
+        (controller as any).service = {
+            getById: jest.fn()
+                .mockRejectedValueOnce(new ZodError([]))
+                .mockRejectedValueOnce(new Error('Aparelho não encontrado'))
+                .mockRejectedValueOnce(new DatabaseError('db error', 400)),
+        };
+
+        await controller.getById(req, res);
+        await controller.getById(req, res);
+        await controller.getById(req, res);
+
+        expect(res.status).toHaveBeenCalledWith(422);
+        expect(res.status).toHaveBeenCalledWith(404);
+        expect(res.status).toHaveBeenCalledWith(400);
+    });
+
+    it('getById handles unknown error', async () => {
+        const res = makeRes();
+        const req = makeReq();
+        (controller as any).service = {
+            getById: jest.fn().mockRejectedValue(new Error('boom')),
+        };
+
+        await controller.getById(req, res);
+        expect(res.status).toHaveBeenCalledWith(500);
     });
 });

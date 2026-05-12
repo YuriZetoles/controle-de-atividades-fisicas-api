@@ -196,6 +196,8 @@ beforeAll(async () => {
         sexo: 'M',
         cref: `ADM-${RUN_ID}`.substring(0, 50),
         turnos: ['MANHA'],
+        especializacao: 'Geral',
+        graduacao: 'Graduado',
         especializacao: 'Administração',
         graduacao: 'Educação Física',
         is_admin: true,
@@ -260,6 +262,8 @@ beforeAll(async () => {
         sexo: 'M',
         cref: `TST-${RUN_ID}`.substring(0, 50),
         turnos: ['MANHA'],
+        especializacao: 'Geral',
+        graduacao: 'Graduado',
         especializacao: 'Teste',
         graduacao: 'Teste',
         is_admin: false,
@@ -846,13 +850,20 @@ describe('GET /exercicios', () => {
 
     it('filtro em_uso=true → 200 somente exercícios vinculados a treinos', async () => {
         asAdmin();
-        const res = await request(app).get('/api/exercicios?escopo=GLOBAL&em_uso=true');
+        const res = await request(app).get(`/api/exercicios?escopo=GLOBAL&em_uso=true&nome=${encodeURIComponent(RUN_ID)}&limite=100`);
 
         expect(res.status).toBe(200);
         const ids = res.body.data.dados.map((e: any) => e.id);
+        expect(ids.length).toBeGreaterThan(0);
         expect(ids).toContain(exGlobal1Id);
         // exGlobal2Id não tem treino_exercicio
         expect(ids).not.toContain(exGlobal2Id);
+
+        const usados = await DataBase
+            .select({ id: treino_exercicio.exercicio_id })
+            .from(treino_exercicio)
+            .where(inArray(treino_exercicio.exercicio_id, ids));
+        expect(usados.length).toBe(ids.length);
     });
 
     it('filtro em_uso=false → 200 somente exercícios sem treino vinculado', async () => {
