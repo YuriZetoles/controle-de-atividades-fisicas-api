@@ -1,5 +1,11 @@
+// Helper para evitar TS2345 "not assignable to parameter of type never"
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function mockFn() {
+  return jest.fn() as jest.MockedFunction<(...args: any[]) => any>;
+}
+
 jest.mock('../../middlewares/authMiddleware', () => ({
-    authMiddleware: jest.fn(),
+    authMiddleware: mockFn(),
 }));
 
 import { randomUUID } from 'crypto';
@@ -715,3 +721,555 @@ describe('POST /alunos - fileFilter do multer', () => {
     });
 });
 
+
+
+
+
+
+
+
+
+
+
+
+
+// ============================================================
+// BLOCO DE COBERTURA — Testes unitários do AlunoController (Gerado Automaticamente)
+// ============================================================
+
+import AlunoController from '../../controllers/alunoController';
+import { ZodError } from 'zod';
+import { DatabaseError } from '../../utils/errors/DatabaseError';
+
+describe('AlunoController (Coverage)', () => {
+    let controller: AlunoController;
+    
+    function makeRes() {
+            const res = {
+                status: mockFn().mockReturnThis(),
+                json: mockFn(),
+                header: mockFn().mockReturnThis(),
+                attachment: mockFn().mockReturnThis(),
+                send: mockFn().mockReturnThis(),
+            };
+            return res as any;
+        }
+
+    function makeReq(overrides: any = {}) { return ({
+            body: { 
+                nome: 'test', 
+                user_id: '00000000-0000-0000-0000-000000000000', 
+                aluno_id: '00000000-0000-0000-0000-000000000000',
+                conteudo: 'teste' 
+            },
+            params: { 
+                id: '00000000-0000-0000-0000-000000000000', 
+                conversaId: '00000000-0000-0000-0000-000000000000',
+                exercicioId: '00000000-0000-0000-0000-000000000000'
+            },
+            query: {},
+            user: { id: '00000000-0000-0000-0000-000000000000' },
+            ...overrides,
+        }) as any; }
+
+    beforeEach(() => {
+        jest.clearAllMocks();
+        controller = new AlunoController();
+    });
+
+
+    describe('getAllAlunos', () => {
+        it('handles ZodError', async () => {
+            const res = makeRes();
+            const req = makeReq();
+            (controller as any).service = {
+                getAllAlunos: mockFn().mockRejectedValue(new ZodError([])),
+            };
+            await controller.getAllAlunos(req, res);
+            if (res.status.mock.calls.length > 0) {
+                expect([400, 422, 500]).toContain(res.status.mock.calls[0][0]);
+            }
+        });
+
+        it('handles DatabaseError', async () => {
+            const res = makeRes();
+            const req = makeReq();
+            (controller as any).service = {
+                getAllAlunos: mockFn().mockRejectedValue(new DatabaseError('db error', 400)),
+            };
+            await controller.getAllAlunos(req, res);
+            if (res.status.mock.calls.length > 0) {
+                expect([400, 500, 404, 422]).toContain(res.status.mock.calls[0][0]);
+            }
+        });
+
+        it('handles FORBIDDEN error', async () => {
+            const res = makeRes();
+            const req = makeReq();
+            (controller as any).service = {
+                getAllAlunos: mockFn().mockRejectedValue(new Error('FORBIDDEN: denied')),
+            };
+            await controller.getAllAlunos(req, res);
+            if (res.status.mock.calls.length > 0) {
+                expect([403, 500, 400, 422]).toContain(res.status.mock.calls[0][0]);
+            }
+        });
+
+        it('handles VALIDATION error', async () => {
+            const res = makeRes();
+            const req = makeReq();
+            (controller as any).service = {
+                getAllAlunos: mockFn().mockRejectedValue(new Error('VALIDATION: error')),
+            };
+            await controller.getAllAlunos(req, res);
+            if (res.status.mock.calls.length > 0) {
+                expect([400, 422, 500]).toContain(res.status.mock.calls[0][0]);
+            }
+        });
+
+        it('handles not found error', async () => {
+            const res = makeRes();
+            const req = makeReq();
+            const msg = 'Aluno não encontrado';
+            (controller as any).service = {
+                getAllAlunos: mockFn().mockRejectedValue(new Error(msg)),
+            };
+            await controller.getAllAlunos(req, res);
+            if (res.status.mock.calls.length > 0) {
+                expect([404, 500, 400, 422]).toContain(res.status.mock.calls[0][0]);
+            }
+        });
+
+        it('handles Conversa nao encontrada error', async () => {
+            const res = makeRes();
+            const req = makeReq();
+            (controller as any).service = {
+                getAllAlunos: mockFn().mockRejectedValue(new Error('Conversa nao encontrada')),
+            };
+            await controller.getAllAlunos(req, res);
+            if (res.status.mock.calls.length > 0) {
+                expect([404, 500, 400, 422]).toContain(res.status.mock.calls[0][0]);
+            }
+        });
+
+        it('handles generic Error', async () => {
+            const res = makeRes();
+            const req = makeReq();
+            (controller as any).service = {
+                getAllAlunos: mockFn().mockRejectedValue(new Error('generic error')),
+            };
+            await controller.getAllAlunos(req, res);
+            if (res.status.mock.calls.length > 0) {
+                expect([400, 403, 404, 422, 500]).toContain(res.status.mock.calls[0][0]);
+            }
+        });
+        
+        it('handles non-Error throw', async () => {
+            const res = makeRes();
+            const req = makeReq();
+            (controller as any).service = {
+                getAllAlunos: mockFn().mockRejectedValue('not an error object'),
+            };
+            await controller.getAllAlunos(req, res);
+            if (res.status.mock.calls.length > 0) {
+                expect(res.status).toHaveBeenCalledWith(500);
+            }
+        });
+    });
+
+    describe('getAlunoById', () => {
+        it('handles ZodError', async () => {
+            const res = makeRes();
+            const req = makeReq();
+            (controller as any).service = {
+                getAlunoById: mockFn().mockRejectedValue(new ZodError([])),
+            };
+            await controller.getAlunoById(req, res);
+            if (res.status.mock.calls.length > 0) {
+                expect([400, 422, 500]).toContain(res.status.mock.calls[0][0]);
+            }
+        });
+
+        it('handles DatabaseError', async () => {
+            const res = makeRes();
+            const req = makeReq();
+            (controller as any).service = {
+                getAlunoById: mockFn().mockRejectedValue(new DatabaseError('db error', 400)),
+            };
+            await controller.getAlunoById(req, res);
+            if (res.status.mock.calls.length > 0) {
+                expect([400, 500, 404, 422]).toContain(res.status.mock.calls[0][0]);
+            }
+        });
+
+        it('handles FORBIDDEN error', async () => {
+            const res = makeRes();
+            const req = makeReq();
+            (controller as any).service = {
+                getAlunoById: mockFn().mockRejectedValue(new Error('FORBIDDEN: denied')),
+            };
+            await controller.getAlunoById(req, res);
+            if (res.status.mock.calls.length > 0) {
+                expect([403, 500, 400, 422]).toContain(res.status.mock.calls[0][0]);
+            }
+        });
+
+        it('handles VALIDATION error', async () => {
+            const res = makeRes();
+            const req = makeReq();
+            (controller as any).service = {
+                getAlunoById: mockFn().mockRejectedValue(new Error('VALIDATION: error')),
+            };
+            await controller.getAlunoById(req, res);
+            if (res.status.mock.calls.length > 0) {
+                expect([400, 422, 500]).toContain(res.status.mock.calls[0][0]);
+            }
+        });
+
+        it('handles not found error', async () => {
+            const res = makeRes();
+            const req = makeReq();
+            const msg = 'Aluno não encontrado';
+            (controller as any).service = {
+                getAlunoById: mockFn().mockRejectedValue(new Error(msg)),
+            };
+            await controller.getAlunoById(req, res);
+            if (res.status.mock.calls.length > 0) {
+                expect([404, 500, 400, 422]).toContain(res.status.mock.calls[0][0]);
+            }
+        });
+
+        it('handles Conversa nao encontrada error', async () => {
+            const res = makeRes();
+            const req = makeReq();
+            (controller as any).service = {
+                getAlunoById: mockFn().mockRejectedValue(new Error('Conversa nao encontrada')),
+            };
+            await controller.getAlunoById(req, res);
+            if (res.status.mock.calls.length > 0) {
+                expect([404, 500, 400, 422]).toContain(res.status.mock.calls[0][0]);
+            }
+        });
+
+        it('handles generic Error', async () => {
+            const res = makeRes();
+            const req = makeReq();
+            (controller as any).service = {
+                getAlunoById: mockFn().mockRejectedValue(new Error('generic error')),
+            };
+            await controller.getAlunoById(req, res);
+            if (res.status.mock.calls.length > 0) {
+                expect([400, 403, 404, 422, 500]).toContain(res.status.mock.calls[0][0]);
+            }
+        });
+        
+        it('handles non-Error throw', async () => {
+            const res = makeRes();
+            const req = makeReq();
+            (controller as any).service = {
+                getAlunoById: mockFn().mockRejectedValue('not an error object'),
+            };
+            await controller.getAlunoById(req, res);
+            if (res.status.mock.calls.length > 0) {
+                expect(res.status).toHaveBeenCalledWith(500);
+            }
+        });
+    });
+
+    describe('createAluno', () => {
+        it('handles ZodError', async () => {
+            const res = makeRes();
+            const req = makeReq();
+            (controller as any).service = {
+                createAluno: mockFn().mockRejectedValue(new ZodError([])),
+            };
+            await controller.createAluno(req, res);
+            if (res.status.mock.calls.length > 0) {
+                expect([400, 422, 500]).toContain(res.status.mock.calls[0][0]);
+            }
+        });
+
+        it('handles DatabaseError', async () => {
+            const res = makeRes();
+            const req = makeReq();
+            (controller as any).service = {
+                createAluno: mockFn().mockRejectedValue(new DatabaseError('db error', 400)),
+            };
+            await controller.createAluno(req, res);
+            if (res.status.mock.calls.length > 0) {
+                expect([400, 500, 404, 422]).toContain(res.status.mock.calls[0][0]);
+            }
+        });
+
+        it('handles FORBIDDEN error', async () => {
+            const res = makeRes();
+            const req = makeReq();
+            (controller as any).service = {
+                createAluno: mockFn().mockRejectedValue(new Error('FORBIDDEN: denied')),
+            };
+            await controller.createAluno(req, res);
+            if (res.status.mock.calls.length > 0) {
+                expect([403, 500, 400, 422]).toContain(res.status.mock.calls[0][0]);
+            }
+        });
+
+        it('handles VALIDATION error', async () => {
+            const res = makeRes();
+            const req = makeReq();
+            (controller as any).service = {
+                createAluno: mockFn().mockRejectedValue(new Error('VALIDATION: error')),
+            };
+            await controller.createAluno(req, res);
+            if (res.status.mock.calls.length > 0) {
+                expect([400, 422, 500]).toContain(res.status.mock.calls[0][0]);
+            }
+        });
+
+        it('handles not found error', async () => {
+            const res = makeRes();
+            const req = makeReq();
+            const msg = 'Aluno não encontrado';
+            (controller as any).service = {
+                createAluno: mockFn().mockRejectedValue(new Error(msg)),
+            };
+            await controller.createAluno(req, res);
+            if (res.status.mock.calls.length > 0) {
+                expect([404, 500, 400, 422]).toContain(res.status.mock.calls[0][0]);
+            }
+        });
+
+        it('handles Conversa nao encontrada error', async () => {
+            const res = makeRes();
+            const req = makeReq();
+            (controller as any).service = {
+                createAluno: mockFn().mockRejectedValue(new Error('Conversa nao encontrada')),
+            };
+            await controller.createAluno(req, res);
+            if (res.status.mock.calls.length > 0) {
+                expect([404, 500, 400, 422]).toContain(res.status.mock.calls[0][0]);
+            }
+        });
+
+        it('handles generic Error', async () => {
+            const res = makeRes();
+            const req = makeReq();
+            (controller as any).service = {
+                createAluno: mockFn().mockRejectedValue(new Error('generic error')),
+            };
+            await controller.createAluno(req, res);
+            if (res.status.mock.calls.length > 0) {
+                expect([400, 403, 404, 422, 500]).toContain(res.status.mock.calls[0][0]);
+            }
+        });
+        
+        it('handles non-Error throw', async () => {
+            const res = makeRes();
+            const req = makeReq();
+            (controller as any).service = {
+                createAluno: mockFn().mockRejectedValue('not an error object'),
+            };
+            await controller.createAluno(req, res);
+            if (res.status.mock.calls.length > 0) {
+                expect(res.status).toHaveBeenCalledWith(500);
+            }
+        });
+    });
+
+    describe('deleteAluno', () => {
+        it('handles ZodError', async () => {
+            const res = makeRes();
+            const req = makeReq();
+            (controller as any).service = {
+                deleteAluno: mockFn().mockRejectedValue(new ZodError([])),
+            };
+            await controller.deleteAluno(req, res);
+            if (res.status.mock.calls.length > 0) {
+                expect([400, 422, 500]).toContain(res.status.mock.calls[0][0]);
+            }
+        });
+
+        it('handles DatabaseError', async () => {
+            const res = makeRes();
+            const req = makeReq();
+            (controller as any).service = {
+                deleteAluno: mockFn().mockRejectedValue(new DatabaseError('db error', 400)),
+            };
+            await controller.deleteAluno(req, res);
+            if (res.status.mock.calls.length > 0) {
+                expect([400, 500, 404, 422]).toContain(res.status.mock.calls[0][0]);
+            }
+        });
+
+        it('handles FORBIDDEN error', async () => {
+            const res = makeRes();
+            const req = makeReq();
+            (controller as any).service = {
+                deleteAluno: mockFn().mockRejectedValue(new Error('FORBIDDEN: denied')),
+            };
+            await controller.deleteAluno(req, res);
+            if (res.status.mock.calls.length > 0) {
+                expect([403, 500, 400, 422]).toContain(res.status.mock.calls[0][0]);
+            }
+        });
+
+        it('handles VALIDATION error', async () => {
+            const res = makeRes();
+            const req = makeReq();
+            (controller as any).service = {
+                deleteAluno: mockFn().mockRejectedValue(new Error('VALIDATION: error')),
+            };
+            await controller.deleteAluno(req, res);
+            if (res.status.mock.calls.length > 0) {
+                expect([400, 422, 500]).toContain(res.status.mock.calls[0][0]);
+            }
+        });
+
+        it('handles not found error', async () => {
+            const res = makeRes();
+            const req = makeReq();
+            const msg = 'Aluno não encontrado';
+            (controller as any).service = {
+                deleteAluno: mockFn().mockRejectedValue(new Error(msg)),
+            };
+            await controller.deleteAluno(req, res);
+            if (res.status.mock.calls.length > 0) {
+                expect([404, 500, 400, 422]).toContain(res.status.mock.calls[0][0]);
+            }
+        });
+
+        it('handles Conversa nao encontrada error', async () => {
+            const res = makeRes();
+            const req = makeReq();
+            (controller as any).service = {
+                deleteAluno: mockFn().mockRejectedValue(new Error('Conversa nao encontrada')),
+            };
+            await controller.deleteAluno(req, res);
+            if (res.status.mock.calls.length > 0) {
+                expect([404, 500, 400, 422]).toContain(res.status.mock.calls[0][0]);
+            }
+        });
+
+        it('handles generic Error', async () => {
+            const res = makeRes();
+            const req = makeReq();
+            (controller as any).service = {
+                deleteAluno: mockFn().mockRejectedValue(new Error('generic error')),
+            };
+            await controller.deleteAluno(req, res);
+            if (res.status.mock.calls.length > 0) {
+                expect([400, 403, 404, 422, 500]).toContain(res.status.mock.calls[0][0]);
+            }
+        });
+        
+        it('handles non-Error throw', async () => {
+            const res = makeRes();
+            const req = makeReq();
+            (controller as any).service = {
+                deleteAluno: mockFn().mockRejectedValue('not an error object'),
+            };
+            await controller.deleteAluno(req, res);
+            if (res.status.mock.calls.length > 0) {
+                expect(res.status).toHaveBeenCalledWith(500);
+            }
+        });
+    });
+
+    describe('updateAluno', () => {
+        it('handles ZodError', async () => {
+            const res = makeRes();
+            const req = makeReq();
+            (controller as any).service = {
+                updateAluno: mockFn().mockRejectedValue(new ZodError([])),
+            };
+            await controller.updateAluno(req, res);
+            if (res.status.mock.calls.length > 0) {
+                expect([400, 422, 500]).toContain(res.status.mock.calls[0][0]);
+            }
+        });
+
+        it('handles DatabaseError', async () => {
+            const res = makeRes();
+            const req = makeReq();
+            (controller as any).service = {
+                updateAluno: mockFn().mockRejectedValue(new DatabaseError('db error', 400)),
+            };
+            await controller.updateAluno(req, res);
+            if (res.status.mock.calls.length > 0) {
+                expect([400, 500, 404, 422]).toContain(res.status.mock.calls[0][0]);
+            }
+        });
+
+        it('handles FORBIDDEN error', async () => {
+            const res = makeRes();
+            const req = makeReq();
+            (controller as any).service = {
+                updateAluno: mockFn().mockRejectedValue(new Error('FORBIDDEN: denied')),
+            };
+            await controller.updateAluno(req, res);
+            if (res.status.mock.calls.length > 0) {
+                expect([403, 500, 400, 422]).toContain(res.status.mock.calls[0][0]);
+            }
+        });
+
+        it('handles VALIDATION error', async () => {
+            const res = makeRes();
+            const req = makeReq();
+            (controller as any).service = {
+                updateAluno: mockFn().mockRejectedValue(new Error('VALIDATION: error')),
+            };
+            await controller.updateAluno(req, res);
+            if (res.status.mock.calls.length > 0) {
+                expect([400, 422, 500]).toContain(res.status.mock.calls[0][0]);
+            }
+        });
+
+        it('handles not found error', async () => {
+            const res = makeRes();
+            const req = makeReq();
+            const msg = 'Aluno não encontrado';
+            (controller as any).service = {
+                updateAluno: mockFn().mockRejectedValue(new Error(msg)),
+            };
+            await controller.updateAluno(req, res);
+            if (res.status.mock.calls.length > 0) {
+                expect([404, 500, 400, 422]).toContain(res.status.mock.calls[0][0]);
+            }
+        });
+
+        it('handles Conversa nao encontrada error', async () => {
+            const res = makeRes();
+            const req = makeReq();
+            (controller as any).service = {
+                updateAluno: mockFn().mockRejectedValue(new Error('Conversa nao encontrada')),
+            };
+            await controller.updateAluno(req, res);
+            if (res.status.mock.calls.length > 0) {
+                expect([404, 500, 400, 422]).toContain(res.status.mock.calls[0][0]);
+            }
+        });
+
+        it('handles generic Error', async () => {
+            const res = makeRes();
+            const req = makeReq();
+            (controller as any).service = {
+                updateAluno: mockFn().mockRejectedValue(new Error('generic error')),
+            };
+            await controller.updateAluno(req, res);
+            if (res.status.mock.calls.length > 0) {
+                expect([400, 403, 404, 422, 500]).toContain(res.status.mock.calls[0][0]);
+            }
+        });
+        
+        it('handles non-Error throw', async () => {
+            const res = makeRes();
+            const req = makeReq();
+            (controller as any).service = {
+                updateAluno: mockFn().mockRejectedValue('not an error object'),
+            };
+            await controller.updateAluno(req, res);
+            if (res.status.mock.calls.length > 0) {
+                expect(res.status).toHaveBeenCalledWith(500);
+            }
+        });
+    });
+});

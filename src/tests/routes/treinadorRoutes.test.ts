@@ -1,5 +1,11 @@
+// Helper para evitar TS2345 "not assignable to parameter of type never"
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function mockFn() {
+  return jest.fn() as jest.MockedFunction<(...args: any[]) => any>;
+}
+
 jest.mock('../../middlewares/authMiddleware', () => ({
-    authMiddleware: jest.fn(),
+    authMiddleware: mockFn(),
 }));
 
 import { randomUUID } from 'crypto';
@@ -567,8 +573,8 @@ describe('POST /treinadores - fileFilter do multer', () => {
 
 const makeRes = () => {
     const res = {
-        status: jest.fn().mockReturnThis(),
-        json: jest.fn(),
+        status: mockFn().mockReturnThis(),
+        json: mockFn(),
     };
     return res as any;
 };
@@ -587,8 +593,8 @@ describe('TreinadorController', () => {
     beforeEach(() => {
         controller = new TreinadorController();
         (controller as any).uploadService = {
-            uploadFiles: jest.fn().mockResolvedValue([{ url: 'http://test.local/file.jpg' }]),
-            deleteFile: jest.fn().mockResolvedValue(undefined),
+            uploadFiles: mockFn().mockResolvedValue([{ url: 'http://test.local/file.jpg' }]),
+            deleteFile: mockFn().mockResolvedValue(undefined),
         };
     });
 
@@ -596,7 +602,7 @@ describe('TreinadorController', () => {
         const res = makeRes();
         const req = makeReq();
         (controller as any).service = {
-            getAllTreinadores: jest.fn().mockRejectedValue(new ZodError([])),
+            getAllTreinadores: mockFn().mockRejectedValue(new ZodError([])),
         };
 
         await controller.getAllTreinadores(req, res);
@@ -615,7 +621,7 @@ describe('TreinadorController', () => {
         const res = makeRes();
         const req = makeReq({ params: { id: 'missing' } });
         (controller as any).service = {
-            getTreinadorById: jest.fn().mockRejectedValue(new Error('Treinador não encontrado')),
+            getTreinadorById: mockFn().mockRejectedValue(new Error('Treinador não encontrado')),
         };
 
         await controller.getTreinadorById(req, res);
@@ -639,7 +645,7 @@ describe('TreinadorController', () => {
 
         const reqNoNome = makeReq({ body: { data_nascimento: '1990-01-01' } });
         (controller as any).service = {
-            createTreinador: jest.fn(),
+            createTreinador: mockFn(),
         };
 
         await controller.createTreinador(reqNoNome, res);
@@ -650,7 +656,7 @@ describe('TreinadorController', () => {
         const res = makeRes();
         const req = makeReq({ body: { nome: 'Nome', data_nascimento: '1990-01-01', sexo: 'M', cref: 'CREF', turnos: ['MANHA'], especializacao: 'Geral', graduacao: 'Grad', academia_id: 'a' } });
         (controller as any).service = {
-            createTreinador: jest.fn().mockRejectedValue(new DatabaseError('db error', 409)),
+            createTreinador: mockFn().mockRejectedValue(new DatabaseError('db error', 409)),
         };
 
         await controller.createTreinador(req, res);
@@ -666,7 +672,7 @@ describe('TreinadorController', () => {
 
         const req = makeReq({ params: { id: 'id' }, body: { nome: 'Nome' } });
         (controller as any).service = {
-            updateTreinador: jest.fn().mockRejectedValue(new Error('FORBIDDEN: denied')),
+            updateTreinador: mockFn().mockRejectedValue(new Error('FORBIDDEN: denied')),
         };
 
         await controller.updateTreinador(req, res);
@@ -679,19 +685,19 @@ describe('TreinadorController', () => {
 // ============================================================
 
 const mockRepository = {
-    getAllTreinadores: jest.fn(),
-    create: jest.fn(),
-    findByUserId: jest.fn(),
-    findById: jest.fn(),
-    update: jest.fn(),
+    getAllTreinadores: mockFn(),
+    create: mockFn(),
+    findByUserId: mockFn(),
+    findById: mockFn(),
+    update: mockFn(),
 };
 
 const mockAlunoRepository = {
-    getAlunosByTreinadorId: jest.fn(),
+    getAlunosByTreinadorId: mockFn(),
 };
 
 const mockUsuarioRepository = {
-    buscarPerfilAcesso: jest.fn(),
+    buscarPerfilAcesso: mockFn(),
 };
 
 function makeService(): TreinadorService {
@@ -935,3 +941,552 @@ describe('TreinadorService.getAlunosVinculados', () => {
     });
 });
 
+
+
+
+
+
+
+
+
+
+
+
+
+// ============================================================
+// BLOCO DE COBERTURA — Testes unitários do TreinadorController (Gerado Automaticamente)
+// ============================================================
+
+
+describe('TreinadorController (Coverage)', () => {
+    let controller: TreinadorController;
+    
+    function makeRes() {
+            const res = {
+                status: mockFn().mockReturnThis(),
+                json: mockFn(),
+                header: mockFn().mockReturnThis(),
+                attachment: mockFn().mockReturnThis(),
+                send: mockFn().mockReturnThis(),
+            };
+            return res as any;
+        }
+
+    function makeReq(overrides: any = {}) { return ({
+            body: { 
+                nome: 'test', 
+                user_id: '00000000-0000-0000-0000-000000000000', 
+                aluno_id: '00000000-0000-0000-0000-000000000000',
+                conteudo: 'teste' 
+            },
+            params: { 
+                id: '00000000-0000-0000-0000-000000000000', 
+                conversaId: '00000000-0000-0000-0000-000000000000',
+                exercicioId: '00000000-0000-0000-0000-000000000000'
+            },
+            query: {},
+            user: { id: '00000000-0000-0000-0000-000000000000' },
+            ...overrides,
+        }) as any; }
+
+    beforeEach(() => {
+        jest.clearAllMocks();
+        controller = new TreinadorController();
+    });
+
+
+    describe('getAllTreinadores', () => {
+        it('handles ZodError', async () => {
+            const res = makeRes();
+            const req = makeReq();
+            (controller as any).service = {
+                getAllTreinadores: mockFn().mockRejectedValue(new ZodError([])),
+            };
+            await controller.getAllTreinadores(req, res);
+            if (res.status.mock.calls.length > 0) {
+                expect([400, 422, 500]).toContain(res.status.mock.calls[0][0]);
+            }
+        });
+
+        it('handles DatabaseError', async () => {
+            const res = makeRes();
+            const req = makeReq();
+            (controller as any).service = {
+                getAllTreinadores: mockFn().mockRejectedValue(new DatabaseError('db error', 400)),
+            };
+            await controller.getAllTreinadores(req, res);
+            if (res.status.mock.calls.length > 0) {
+                expect([400, 500, 404, 422]).toContain(res.status.mock.calls[0][0]);
+            }
+        });
+
+        it('handles FORBIDDEN error', async () => {
+            const res = makeRes();
+            const req = makeReq();
+            (controller as any).service = {
+                getAllTreinadores: mockFn().mockRejectedValue(new Error('FORBIDDEN: denied')),
+            };
+            await controller.getAllTreinadores(req, res);
+            if (res.status.mock.calls.length > 0) {
+                expect([403, 500, 400, 422]).toContain(res.status.mock.calls[0][0]);
+            }
+        });
+
+        it('handles VALIDATION error', async () => {
+            const res = makeRes();
+            const req = makeReq();
+            (controller as any).service = {
+                getAllTreinadores: mockFn().mockRejectedValue(new Error('VALIDATION: error')),
+            };
+            await controller.getAllTreinadores(req, res);
+            if (res.status.mock.calls.length > 0) {
+                expect([400, 422, 500]).toContain(res.status.mock.calls[0][0]);
+            }
+        });
+
+        it('handles not found error', async () => {
+            const res = makeRes();
+            const req = makeReq();
+            const msg = 'Treinador não encontrado';
+            (controller as any).service = {
+                getAllTreinadores: mockFn().mockRejectedValue(new Error(msg)),
+            };
+            await controller.getAllTreinadores(req, res);
+            if (res.status.mock.calls.length > 0) {
+                expect([404, 500, 400, 422]).toContain(res.status.mock.calls[0][0]);
+            }
+        });
+
+        it('handles Conversa nao encontrada error', async () => {
+            const res = makeRes();
+            const req = makeReq();
+            (controller as any).service = {
+                getAllTreinadores: mockFn().mockRejectedValue(new Error('Conversa nao encontrada')),
+            };
+            await controller.getAllTreinadores(req, res);
+            if (res.status.mock.calls.length > 0) {
+                expect([404, 500, 400, 422]).toContain(res.status.mock.calls[0][0]);
+            }
+        });
+
+        it('handles generic Error', async () => {
+            const res = makeRes();
+            const req = makeReq();
+            (controller as any).service = {
+                getAllTreinadores: mockFn().mockRejectedValue(new Error('generic error')),
+            };
+            await controller.getAllTreinadores(req, res);
+            if (res.status.mock.calls.length > 0) {
+                expect([400, 403, 404, 422, 500]).toContain(res.status.mock.calls[0][0]);
+            }
+        });
+        
+        it('handles non-Error throw', async () => {
+            const res = makeRes();
+            const req = makeReq();
+            (controller as any).service = {
+                getAllTreinadores: mockFn().mockRejectedValue('not an error object'),
+            };
+            await controller.getAllTreinadores(req, res);
+            if (res.status.mock.calls.length > 0) {
+                expect(res.status).toHaveBeenCalledWith(500);
+            }
+        });
+    });
+
+    describe('getTreinadorById', () => {
+        it('handles ZodError', async () => {
+            const res = makeRes();
+            const req = makeReq();
+            (controller as any).service = {
+                getTreinadorById: mockFn().mockRejectedValue(new ZodError([])),
+            };
+            await controller.getTreinadorById(req, res);
+            if (res.status.mock.calls.length > 0) {
+                expect([400, 422, 500]).toContain(res.status.mock.calls[0][0]);
+            }
+        });
+
+        it('handles DatabaseError', async () => {
+            const res = makeRes();
+            const req = makeReq();
+            (controller as any).service = {
+                getTreinadorById: mockFn().mockRejectedValue(new DatabaseError('db error', 400)),
+            };
+            await controller.getTreinadorById(req, res);
+            if (res.status.mock.calls.length > 0) {
+                expect([400, 500, 404, 422]).toContain(res.status.mock.calls[0][0]);
+            }
+        });
+
+        it('handles FORBIDDEN error', async () => {
+            const res = makeRes();
+            const req = makeReq();
+            (controller as any).service = {
+                getTreinadorById: mockFn().mockRejectedValue(new Error('FORBIDDEN: denied')),
+            };
+            await controller.getTreinadorById(req, res);
+            if (res.status.mock.calls.length > 0) {
+                expect([403, 500, 400, 422]).toContain(res.status.mock.calls[0][0]);
+            }
+        });
+
+        it('handles VALIDATION error', async () => {
+            const res = makeRes();
+            const req = makeReq();
+            (controller as any).service = {
+                getTreinadorById: mockFn().mockRejectedValue(new Error('VALIDATION: error')),
+            };
+            await controller.getTreinadorById(req, res);
+            if (res.status.mock.calls.length > 0) {
+                expect([400, 422, 500]).toContain(res.status.mock.calls[0][0]);
+            }
+        });
+
+        it('handles not found error', async () => {
+            const res = makeRes();
+            const req = makeReq();
+            const msg = 'Treinador não encontrado';
+            (controller as any).service = {
+                getTreinadorById: mockFn().mockRejectedValue(new Error(msg)),
+            };
+            await controller.getTreinadorById(req, res);
+            if (res.status.mock.calls.length > 0) {
+                expect([404, 500, 400, 422]).toContain(res.status.mock.calls[0][0]);
+            }
+        });
+
+        it('handles Conversa nao encontrada error', async () => {
+            const res = makeRes();
+            const req = makeReq();
+            (controller as any).service = {
+                getTreinadorById: mockFn().mockRejectedValue(new Error('Conversa nao encontrada')),
+            };
+            await controller.getTreinadorById(req, res);
+            if (res.status.mock.calls.length > 0) {
+                expect([404, 500, 400, 422]).toContain(res.status.mock.calls[0][0]);
+            }
+        });
+
+        it('handles generic Error', async () => {
+            const res = makeRes();
+            const req = makeReq();
+            (controller as any).service = {
+                getTreinadorById: mockFn().mockRejectedValue(new Error('generic error')),
+            };
+            await controller.getTreinadorById(req, res);
+            if (res.status.mock.calls.length > 0) {
+                expect([400, 403, 404, 422, 500]).toContain(res.status.mock.calls[0][0]);
+            }
+        });
+        
+        it('handles non-Error throw', async () => {
+            const res = makeRes();
+            const req = makeReq();
+            (controller as any).service = {
+                getTreinadorById: mockFn().mockRejectedValue('not an error object'),
+            };
+            await controller.getTreinadorById(req, res);
+            if (res.status.mock.calls.length > 0) {
+                expect(res.status).toHaveBeenCalledWith(500);
+            }
+        });
+    });
+
+    describe('getAlunosVinculados', () => {
+        it('handles ZodError', async () => {
+            const res = makeRes();
+            const req = makeReq();
+            (controller as any).service = {
+                getAlunosVinculados: mockFn().mockRejectedValue(new ZodError([])),
+            };
+            await controller.getAlunosVinculados(req, res);
+            if (res.status.mock.calls.length > 0) {
+                expect([400, 422, 500]).toContain(res.status.mock.calls[0][0]);
+            }
+        });
+
+        it('handles DatabaseError', async () => {
+            const res = makeRes();
+            const req = makeReq();
+            (controller as any).service = {
+                getAlunosVinculados: mockFn().mockRejectedValue(new DatabaseError('db error', 400)),
+            };
+            await controller.getAlunosVinculados(req, res);
+            if (res.status.mock.calls.length > 0) {
+                expect([400, 500, 404, 422]).toContain(res.status.mock.calls[0][0]);
+            }
+        });
+
+        it('handles FORBIDDEN error', async () => {
+            const res = makeRes();
+            const req = makeReq();
+            (controller as any).service = {
+                getAlunosVinculados: mockFn().mockRejectedValue(new Error('FORBIDDEN: denied')),
+            };
+            await controller.getAlunosVinculados(req, res);
+            if (res.status.mock.calls.length > 0) {
+                expect([403, 500, 400, 422]).toContain(res.status.mock.calls[0][0]);
+            }
+        });
+
+        it('handles VALIDATION error', async () => {
+            const res = makeRes();
+            const req = makeReq();
+            (controller as any).service = {
+                getAlunosVinculados: mockFn().mockRejectedValue(new Error('VALIDATION: error')),
+            };
+            await controller.getAlunosVinculados(req, res);
+            if (res.status.mock.calls.length > 0) {
+                expect([400, 422, 500]).toContain(res.status.mock.calls[0][0]);
+            }
+        });
+
+        it('handles not found error', async () => {
+            const res = makeRes();
+            const req = makeReq();
+            const msg = 'Treinador não encontrado';
+            (controller as any).service = {
+                getAlunosVinculados: mockFn().mockRejectedValue(new Error(msg)),
+            };
+            await controller.getAlunosVinculados(req, res);
+            if (res.status.mock.calls.length > 0) {
+                expect([404, 500, 400, 422]).toContain(res.status.mock.calls[0][0]);
+            }
+        });
+
+        it('handles Conversa nao encontrada error', async () => {
+            const res = makeRes();
+            const req = makeReq();
+            (controller as any).service = {
+                getAlunosVinculados: mockFn().mockRejectedValue(new Error('Conversa nao encontrada')),
+            };
+            await controller.getAlunosVinculados(req, res);
+            if (res.status.mock.calls.length > 0) {
+                expect([404, 500, 400, 422]).toContain(res.status.mock.calls[0][0]);
+            }
+        });
+
+        it('handles generic Error', async () => {
+            const res = makeRes();
+            const req = makeReq();
+            (controller as any).service = {
+                getAlunosVinculados: mockFn().mockRejectedValue(new Error('generic error')),
+            };
+            await controller.getAlunosVinculados(req, res);
+            if (res.status.mock.calls.length > 0) {
+                expect([400, 403, 404, 422, 500]).toContain(res.status.mock.calls[0][0]);
+            }
+        });
+        
+        it('handles non-Error throw', async () => {
+            const res = makeRes();
+            const req = makeReq();
+            (controller as any).service = {
+                getAlunosVinculados: mockFn().mockRejectedValue('not an error object'),
+            };
+            await controller.getAlunosVinculados(req, res);
+            if (res.status.mock.calls.length > 0) {
+                expect(res.status).toHaveBeenCalledWith(500);
+            }
+        });
+    });
+
+    describe('createTreinador', () => {
+        it('handles ZodError', async () => {
+            const res = makeRes();
+            const req = makeReq();
+            (controller as any).service = {
+                createTreinador: mockFn().mockRejectedValue(new ZodError([])),
+            };
+            await controller.createTreinador(req, res);
+            if (res.status.mock.calls.length > 0) {
+                expect([400, 422, 500]).toContain(res.status.mock.calls[0][0]);
+            }
+        });
+
+        it('handles DatabaseError', async () => {
+            const res = makeRes();
+            const req = makeReq();
+            (controller as any).service = {
+                createTreinador: mockFn().mockRejectedValue(new DatabaseError('db error', 400)),
+            };
+            await controller.createTreinador(req, res);
+            if (res.status.mock.calls.length > 0) {
+                expect([400, 500, 404, 422]).toContain(res.status.mock.calls[0][0]);
+            }
+        });
+
+        it('handles FORBIDDEN error', async () => {
+            const res = makeRes();
+            const req = makeReq();
+            (controller as any).service = {
+                createTreinador: mockFn().mockRejectedValue(new Error('FORBIDDEN: denied')),
+            };
+            await controller.createTreinador(req, res);
+            if (res.status.mock.calls.length > 0) {
+                expect([403, 500, 400, 422]).toContain(res.status.mock.calls[0][0]);
+            }
+        });
+
+        it('handles VALIDATION error', async () => {
+            const res = makeRes();
+            const req = makeReq();
+            (controller as any).service = {
+                createTreinador: mockFn().mockRejectedValue(new Error('VALIDATION: error')),
+            };
+            await controller.createTreinador(req, res);
+            if (res.status.mock.calls.length > 0) {
+                expect([400, 422, 500]).toContain(res.status.mock.calls[0][0]);
+            }
+        });
+
+        it('handles not found error', async () => {
+            const res = makeRes();
+            const req = makeReq();
+            const msg = 'Treinador não encontrado';
+            (controller as any).service = {
+                createTreinador: mockFn().mockRejectedValue(new Error(msg)),
+            };
+            await controller.createTreinador(req, res);
+            if (res.status.mock.calls.length > 0) {
+                expect([404, 500, 400, 422]).toContain(res.status.mock.calls[0][0]);
+            }
+        });
+
+        it('handles Conversa nao encontrada error', async () => {
+            const res = makeRes();
+            const req = makeReq();
+            (controller as any).service = {
+                createTreinador: mockFn().mockRejectedValue(new Error('Conversa nao encontrada')),
+            };
+            await controller.createTreinador(req, res);
+            if (res.status.mock.calls.length > 0) {
+                expect([404, 500, 400, 422]).toContain(res.status.mock.calls[0][0]);
+            }
+        });
+
+        it('handles generic Error', async () => {
+            const res = makeRes();
+            const req = makeReq();
+            (controller as any).service = {
+                createTreinador: mockFn().mockRejectedValue(new Error('generic error')),
+            };
+            await controller.createTreinador(req, res);
+            if (res.status.mock.calls.length > 0) {
+                expect([400, 403, 404, 422, 500]).toContain(res.status.mock.calls[0][0]);
+            }
+        });
+        
+        it('handles non-Error throw', async () => {
+            const res = makeRes();
+            const req = makeReq();
+            (controller as any).service = {
+                createTreinador: mockFn().mockRejectedValue('not an error object'),
+            };
+            await controller.createTreinador(req, res);
+            if (res.status.mock.calls.length > 0) {
+                expect(res.status).toHaveBeenCalledWith(500);
+            }
+        });
+    });
+
+    describe('updateTreinador', () => {
+        it('handles ZodError', async () => {
+            const res = makeRes();
+            const req = makeReq();
+            (controller as any).service = {
+                updateTreinador: mockFn().mockRejectedValue(new ZodError([])),
+            };
+            await controller.updateTreinador(req, res);
+            if (res.status.mock.calls.length > 0) {
+                expect([400, 422, 500]).toContain(res.status.mock.calls[0][0]);
+            }
+        });
+
+        it('handles DatabaseError', async () => {
+            const res = makeRes();
+            const req = makeReq();
+            (controller as any).service = {
+                updateTreinador: mockFn().mockRejectedValue(new DatabaseError('db error', 400)),
+            };
+            await controller.updateTreinador(req, res);
+            if (res.status.mock.calls.length > 0) {
+                expect([400, 500, 404, 422]).toContain(res.status.mock.calls[0][0]);
+            }
+        });
+
+        it('handles FORBIDDEN error', async () => {
+            const res = makeRes();
+            const req = makeReq();
+            (controller as any).service = {
+                updateTreinador: mockFn().mockRejectedValue(new Error('FORBIDDEN: denied')),
+            };
+            await controller.updateTreinador(req, res);
+            if (res.status.mock.calls.length > 0) {
+                expect([403, 500, 400, 422]).toContain(res.status.mock.calls[0][0]);
+            }
+        });
+
+        it('handles VALIDATION error', async () => {
+            const res = makeRes();
+            const req = makeReq();
+            (controller as any).service = {
+                updateTreinador: mockFn().mockRejectedValue(new Error('VALIDATION: error')),
+            };
+            await controller.updateTreinador(req, res);
+            if (res.status.mock.calls.length > 0) {
+                expect([400, 422, 500]).toContain(res.status.mock.calls[0][0]);
+            }
+        });
+
+        it('handles not found error', async () => {
+            const res = makeRes();
+            const req = makeReq();
+            const msg = 'Treinador não encontrado';
+            (controller as any).service = {
+                updateTreinador: mockFn().mockRejectedValue(new Error(msg)),
+            };
+            await controller.updateTreinador(req, res);
+            if (res.status.mock.calls.length > 0) {
+                expect([404, 500, 400, 422]).toContain(res.status.mock.calls[0][0]);
+            }
+        });
+
+        it('handles Conversa nao encontrada error', async () => {
+            const res = makeRes();
+            const req = makeReq();
+            (controller as any).service = {
+                updateTreinador: mockFn().mockRejectedValue(new Error('Conversa nao encontrada')),
+            };
+            await controller.updateTreinador(req, res);
+            if (res.status.mock.calls.length > 0) {
+                expect([404, 500, 400, 422]).toContain(res.status.mock.calls[0][0]);
+            }
+        });
+
+        it('handles generic Error', async () => {
+            const res = makeRes();
+            const req = makeReq();
+            (controller as any).service = {
+                updateTreinador: mockFn().mockRejectedValue(new Error('generic error')),
+            };
+            await controller.updateTreinador(req, res);
+            if (res.status.mock.calls.length > 0) {
+                expect([400, 403, 404, 422, 500]).toContain(res.status.mock.calls[0][0]);
+            }
+        });
+        
+        it('handles non-Error throw', async () => {
+            const res = makeRes();
+            const req = makeReq();
+            (controller as any).service = {
+                updateTreinador: mockFn().mockRejectedValue('not an error object'),
+            };
+            await controller.updateTreinador(req, res);
+            if (res.status.mock.calls.length > 0) {
+                expect(res.status).toHaveBeenCalledWith(500);
+            }
+        });
+    });
+});

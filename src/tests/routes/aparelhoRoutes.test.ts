@@ -1,5 +1,11 @@
+// Helper para evitar TS2345 "not assignable to parameter of type never"
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function mockFn() {
+  return jest.fn() as jest.MockedFunction<(...args: any[]) => any>;
+}
+
 jest.mock('../../middlewares/authMiddleware', () => ({
-    authMiddleware: jest.fn(),
+    authMiddleware: mockFn(),
 }));
 
 import { randomUUID } from 'crypto';
@@ -129,8 +135,6 @@ beforeAll(async () => {
         sexo: 'M',
         cref: `ADM_AP_${RUN_ID}`.substring(0, 50),
         turnos: ['MANHA'],
-        especializacao: 'Geral',
-        graduacao: 'Graduado',
         especializacao: 'Administração',
         graduacao: 'Educação Física',
         is_admin: true,
@@ -175,8 +179,6 @@ beforeAll(async () => {
         sexo: 'M',
         cref: `TR_AP_${RUN_ID}`.substring(0, 50),
         turnos: ['TARDE'],
-        especializacao: 'Geral',
-        graduacao: 'Graduado',
         especializacao: 'Musculação',
         graduacao: 'Educação Física',
         is_admin: false,
@@ -494,8 +496,8 @@ describe('GET /aparelhos/:id', () => {
 
 const makeRes = () => {
     const res = {
-        status: jest.fn().mockReturnThis(),
-        json: jest.fn(),
+        status: mockFn().mockReturnThis(),
+        json: mockFn(),
     };
     return res as any;
 };
@@ -517,7 +519,7 @@ describe('AparelhoController', () => {
         const res = makeRes();
         const req = makeReq();
         (controller as any).service = {
-            getAll: jest.fn()
+            getAll: mockFn()
                 .mockRejectedValueOnce(new ZodError([]))
                 .mockRejectedValueOnce(new DatabaseError('db error', 409)),
         };
@@ -533,7 +535,7 @@ describe('AparelhoController', () => {
         const res = makeRes();
         const req = makeReq();
         (controller as any).service = {
-            getAll: jest.fn().mockRejectedValue(new Error('boom')),
+            getAll: mockFn().mockRejectedValue(new Error('boom')),
         };
 
         await controller.getAll(req, res);
@@ -544,7 +546,7 @@ describe('AparelhoController', () => {
         const res = makeRes();
         const req = makeReq({ params: { id: 'id' } });
         (controller as any).service = {
-            getById: jest.fn()
+            getById: mockFn()
                 .mockRejectedValueOnce(new ZodError([]))
                 .mockRejectedValueOnce(new Error('Aparelho não encontrado'))
                 .mockRejectedValueOnce(new DatabaseError('db error', 400)),
@@ -563,7 +565,7 @@ describe('AparelhoController', () => {
         const res = makeRes();
         const req = makeReq();
         (controller as any).service = {
-            getById: jest.fn().mockRejectedValue(new Error('boom')),
+            getById: mockFn().mockRejectedValue(new Error('boom')),
         };
 
         await controller.getById(req, res);

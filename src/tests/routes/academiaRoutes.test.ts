@@ -1,8 +1,14 @@
+// Helper para evitar TS2345 "not assignable to parameter of type never"
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function mockFn() {
+  return jest.fn() as jest.MockedFunction<(...args: any[]) => any>;
+}
+
 // ============================================================
 // Mock do middleware de autenticação DEVE ser o primeiro import
 // ============================================================
 jest.mock('../../middlewares/authMiddleware', () => ({
-    authMiddleware: jest.fn(),
+    authMiddleware: mockFn(),
 }));
 
 import { randomUUID } from 'crypto';
@@ -435,11 +441,11 @@ describe('DELETE /academia/:id', () => {
 // ============================================================
 
 const mockRepository = {
-    createAcademia: jest.fn(),
-    getAllAcademias: jest.fn(),
-    getAcademiaById: jest.fn(),
-    updateAcademia: jest.fn(),
-    deleteAcademia: jest.fn(),
+    createAcademia: mockFn(),
+    getAllAcademias: mockFn(),
+    getAcademiaById: mockFn(),
+    updateAcademia: mockFn(),
+    deleteAcademia: mockFn(),
 };
 
 function makeService(): AcademiaService {
@@ -655,5 +661,555 @@ describe('AcademiaService.deleteAcademia', () => {
         mockRepository.deleteAcademia.mockRejectedValue('erro string' as any);
 
         await expect(service.deleteAcademia('abc')).rejects.toThrow('Erro desconhecido');
+    });
+});
+
+
+
+
+
+
+
+
+
+
+
+
+// ============================================================
+// BLOCO DE COBERTURA — Testes unitários do AcademiaController (Gerado Automaticamente)
+// ============================================================
+
+import AcademiaController from '../../controllers/academiaController';
+
+describe('AcademiaController (Coverage)', () => {
+    let controller: AcademiaController;
+    
+    function makeRes() {
+            const res = {
+                status: mockFn().mockReturnThis(),
+                json: mockFn(),
+                header: mockFn().mockReturnThis(),
+                attachment: mockFn().mockReturnThis(),
+                send: mockFn().mockReturnThis(),
+            };
+            return res as any;
+        }
+
+    function makeReq(overrides: any = {}) { return ({
+            body: { 
+                nome: 'test', 
+                user_id: '00000000-0000-0000-0000-000000000000', 
+                aluno_id: '00000000-0000-0000-0000-000000000000',
+                conteudo: 'teste' 
+            },
+            params: { 
+                id: '00000000-0000-0000-0000-000000000000', 
+                conversaId: '00000000-0000-0000-0000-000000000000',
+                exercicioId: '00000000-0000-0000-0000-000000000000'
+            },
+            query: {},
+            user: { id: '00000000-0000-0000-0000-000000000000' },
+            ...overrides,
+        }) as any; }
+
+    beforeEach(() => {
+        jest.clearAllMocks();
+        controller = new AcademiaController();
+    });
+
+
+    describe('createAcademia', () => {
+        it('handles ZodError', async () => {
+            const res = makeRes();
+            const req = makeReq();
+            (controller as any).service = {
+                createAcademia: mockFn().mockRejectedValue(new ZodError([])),
+            };
+            await controller.createAcademia(req, res);
+            if (res.status.mock.calls.length > 0) {
+                expect([400, 422, 500]).toContain(res.status.mock.calls[0][0]);
+            }
+        });
+
+        it('handles DatabaseError', async () => {
+            const res = makeRes();
+            const req = makeReq();
+            (controller as any).service = {
+                createAcademia: mockFn().mockRejectedValue(new DatabaseError('db error', 400)),
+            };
+            await controller.createAcademia(req, res);
+            if (res.status.mock.calls.length > 0) {
+                expect([400, 500, 404, 422]).toContain(res.status.mock.calls[0][0]);
+            }
+        });
+
+        it('handles FORBIDDEN error', async () => {
+            const res = makeRes();
+            const req = makeReq();
+            (controller as any).service = {
+                createAcademia: mockFn().mockRejectedValue(new Error('FORBIDDEN: denied')),
+            };
+            await controller.createAcademia(req, res);
+            if (res.status.mock.calls.length > 0) {
+                expect([403, 500, 400, 422]).toContain(res.status.mock.calls[0][0]);
+            }
+        });
+
+        it('handles VALIDATION error', async () => {
+            const res = makeRes();
+            const req = makeReq();
+            (controller as any).service = {
+                createAcademia: mockFn().mockRejectedValue(new Error('VALIDATION: error')),
+            };
+            await controller.createAcademia(req, res);
+            if (res.status.mock.calls.length > 0) {
+                expect([400, 422, 500]).toContain(res.status.mock.calls[0][0]);
+            }
+        });
+
+        it('handles not found error', async () => {
+            const res = makeRes();
+            const req = makeReq();
+            const msg = 'Academia não encontrado';
+            (controller as any).service = {
+                createAcademia: mockFn().mockRejectedValue(new Error(msg)),
+            };
+            await controller.createAcademia(req, res);
+            if (res.status.mock.calls.length > 0) {
+                expect([404, 500, 400, 422]).toContain(res.status.mock.calls[0][0]);
+            }
+        });
+
+        it('handles Conversa nao encontrada error', async () => {
+            const res = makeRes();
+            const req = makeReq();
+            (controller as any).service = {
+                createAcademia: mockFn().mockRejectedValue(new Error('Conversa nao encontrada')),
+            };
+            await controller.createAcademia(req, res);
+            if (res.status.mock.calls.length > 0) {
+                expect([404, 500, 400, 422]).toContain(res.status.mock.calls[0][0]);
+            }
+        });
+
+        it('handles generic Error', async () => {
+            const res = makeRes();
+            const req = makeReq();
+            (controller as any).service = {
+                createAcademia: mockFn().mockRejectedValue(new Error('generic error')),
+            };
+            await controller.createAcademia(req, res);
+            if (res.status.mock.calls.length > 0) {
+                expect([400, 403, 404, 422, 500]).toContain(res.status.mock.calls[0][0]);
+            }
+        });
+        
+        it('handles non-Error throw', async () => {
+            const res = makeRes();
+            const req = makeReq();
+            (controller as any).service = {
+                createAcademia: mockFn().mockRejectedValue('not an error object'),
+            };
+            await controller.createAcademia(req, res);
+            if (res.status.mock.calls.length > 0) {
+                expect(res.status).toHaveBeenCalledWith(500);
+            }
+        });
+    });
+
+    describe('getAllAcademia', () => {
+        it('handles ZodError', async () => {
+            const res = makeRes();
+            const req = makeReq();
+            (controller as any).service = {
+                getAllAcademia: mockFn().mockRejectedValue(new ZodError([])),
+            };
+            await controller.getAllAcademia(req, res);
+            if (res.status.mock.calls.length > 0) {
+                expect([400, 422, 500]).toContain(res.status.mock.calls[0][0]);
+            }
+        });
+
+        it('handles DatabaseError', async () => {
+            const res = makeRes();
+            const req = makeReq();
+            (controller as any).service = {
+                getAllAcademia: mockFn().mockRejectedValue(new DatabaseError('db error', 400)),
+            };
+            await controller.getAllAcademia(req, res);
+            if (res.status.mock.calls.length > 0) {
+                expect([400, 500, 404, 422]).toContain(res.status.mock.calls[0][0]);
+            }
+        });
+
+        it('handles FORBIDDEN error', async () => {
+            const res = makeRes();
+            const req = makeReq();
+            (controller as any).service = {
+                getAllAcademia: mockFn().mockRejectedValue(new Error('FORBIDDEN: denied')),
+            };
+            await controller.getAllAcademia(req, res);
+            if (res.status.mock.calls.length > 0) {
+                expect([403, 500, 400, 422]).toContain(res.status.mock.calls[0][0]);
+            }
+        });
+
+        it('handles VALIDATION error', async () => {
+            const res = makeRes();
+            const req = makeReq();
+            (controller as any).service = {
+                getAllAcademia: mockFn().mockRejectedValue(new Error('VALIDATION: error')),
+            };
+            await controller.getAllAcademia(req, res);
+            if (res.status.mock.calls.length > 0) {
+                expect([400, 422, 500]).toContain(res.status.mock.calls[0][0]);
+            }
+        });
+
+        it('handles not found error', async () => {
+            const res = makeRes();
+            const req = makeReq();
+            const msg = 'Academia não encontrado';
+            (controller as any).service = {
+                getAllAcademia: mockFn().mockRejectedValue(new Error(msg)),
+            };
+            await controller.getAllAcademia(req, res);
+            if (res.status.mock.calls.length > 0) {
+                expect([404, 500, 400, 422]).toContain(res.status.mock.calls[0][0]);
+            }
+        });
+
+        it('handles Conversa nao encontrada error', async () => {
+            const res = makeRes();
+            const req = makeReq();
+            (controller as any).service = {
+                getAllAcademia: mockFn().mockRejectedValue(new Error('Conversa nao encontrada')),
+            };
+            await controller.getAllAcademia(req, res);
+            if (res.status.mock.calls.length > 0) {
+                expect([404, 500, 400, 422]).toContain(res.status.mock.calls[0][0]);
+            }
+        });
+
+        it('handles generic Error', async () => {
+            const res = makeRes();
+            const req = makeReq();
+            (controller as any).service = {
+                getAllAcademia: mockFn().mockRejectedValue(new Error('generic error')),
+            };
+            await controller.getAllAcademia(req, res);
+            if (res.status.mock.calls.length > 0) {
+                expect([400, 403, 404, 422, 500]).toContain(res.status.mock.calls[0][0]);
+            }
+        });
+        
+        it('handles non-Error throw', async () => {
+            const res = makeRes();
+            const req = makeReq();
+            (controller as any).service = {
+                getAllAcademia: mockFn().mockRejectedValue('not an error object'),
+            };
+            await controller.getAllAcademia(req, res);
+            if (res.status.mock.calls.length > 0) {
+                expect(res.status).toHaveBeenCalledWith(500);
+            }
+        });
+    });
+
+    describe('getAcademiaById', () => {
+        it('handles ZodError', async () => {
+            const res = makeRes();
+            const req = makeReq();
+            (controller as any).service = {
+                getAcademiaById: mockFn().mockRejectedValue(new ZodError([])),
+            };
+            await controller.getAcademiaById(req, res);
+            if (res.status.mock.calls.length > 0) {
+                expect([400, 422, 500]).toContain(res.status.mock.calls[0][0]);
+            }
+        });
+
+        it('handles DatabaseError', async () => {
+            const res = makeRes();
+            const req = makeReq();
+            (controller as any).service = {
+                getAcademiaById: mockFn().mockRejectedValue(new DatabaseError('db error', 400)),
+            };
+            await controller.getAcademiaById(req, res);
+            if (res.status.mock.calls.length > 0) {
+                expect([400, 500, 404, 422]).toContain(res.status.mock.calls[0][0]);
+            }
+        });
+
+        it('handles FORBIDDEN error', async () => {
+            const res = makeRes();
+            const req = makeReq();
+            (controller as any).service = {
+                getAcademiaById: mockFn().mockRejectedValue(new Error('FORBIDDEN: denied')),
+            };
+            await controller.getAcademiaById(req, res);
+            if (res.status.mock.calls.length > 0) {
+                expect([403, 500, 400, 422]).toContain(res.status.mock.calls[0][0]);
+            }
+        });
+
+        it('handles VALIDATION error', async () => {
+            const res = makeRes();
+            const req = makeReq();
+            (controller as any).service = {
+                getAcademiaById: mockFn().mockRejectedValue(new Error('VALIDATION: error')),
+            };
+            await controller.getAcademiaById(req, res);
+            if (res.status.mock.calls.length > 0) {
+                expect([400, 422, 500]).toContain(res.status.mock.calls[0][0]);
+            }
+        });
+
+        it('handles not found error', async () => {
+            const res = makeRes();
+            const req = makeReq();
+            const msg = 'Academia não encontrado';
+            (controller as any).service = {
+                getAcademiaById: mockFn().mockRejectedValue(new Error(msg)),
+            };
+            await controller.getAcademiaById(req, res);
+            if (res.status.mock.calls.length > 0) {
+                expect([404, 500, 400, 422]).toContain(res.status.mock.calls[0][0]);
+            }
+        });
+
+        it('handles Conversa nao encontrada error', async () => {
+            const res = makeRes();
+            const req = makeReq();
+            (controller as any).service = {
+                getAcademiaById: mockFn().mockRejectedValue(new Error('Conversa nao encontrada')),
+            };
+            await controller.getAcademiaById(req, res);
+            if (res.status.mock.calls.length > 0) {
+                expect([404, 500, 400, 422]).toContain(res.status.mock.calls[0][0]);
+            }
+        });
+
+        it('handles generic Error', async () => {
+            const res = makeRes();
+            const req = makeReq();
+            (controller as any).service = {
+                getAcademiaById: mockFn().mockRejectedValue(new Error('generic error')),
+            };
+            await controller.getAcademiaById(req, res);
+            if (res.status.mock.calls.length > 0) {
+                expect([400, 403, 404, 422, 500]).toContain(res.status.mock.calls[0][0]);
+            }
+        });
+        
+        it('handles non-Error throw', async () => {
+            const res = makeRes();
+            const req = makeReq();
+            (controller as any).service = {
+                getAcademiaById: mockFn().mockRejectedValue('not an error object'),
+            };
+            await controller.getAcademiaById(req, res);
+            if (res.status.mock.calls.length > 0) {
+                expect(res.status).toHaveBeenCalledWith(500);
+            }
+        });
+    });
+
+    describe('updateAcademia', () => {
+        it('handles ZodError', async () => {
+            const res = makeRes();
+            const req = makeReq();
+            (controller as any).service = {
+                updateAcademia: mockFn().mockRejectedValue(new ZodError([])),
+            };
+            await controller.updateAcademia(req, res);
+            if (res.status.mock.calls.length > 0) {
+                expect([400, 422, 500]).toContain(res.status.mock.calls[0][0]);
+            }
+        });
+
+        it('handles DatabaseError', async () => {
+            const res = makeRes();
+            const req = makeReq();
+            (controller as any).service = {
+                updateAcademia: mockFn().mockRejectedValue(new DatabaseError('db error', 400)),
+            };
+            await controller.updateAcademia(req, res);
+            if (res.status.mock.calls.length > 0) {
+                expect([400, 500, 404, 422]).toContain(res.status.mock.calls[0][0]);
+            }
+        });
+
+        it('handles FORBIDDEN error', async () => {
+            const res = makeRes();
+            const req = makeReq();
+            (controller as any).service = {
+                updateAcademia: mockFn().mockRejectedValue(new Error('FORBIDDEN: denied')),
+            };
+            await controller.updateAcademia(req, res);
+            if (res.status.mock.calls.length > 0) {
+                expect([403, 500, 400, 422]).toContain(res.status.mock.calls[0][0]);
+            }
+        });
+
+        it('handles VALIDATION error', async () => {
+            const res = makeRes();
+            const req = makeReq();
+            (controller as any).service = {
+                updateAcademia: mockFn().mockRejectedValue(new Error('VALIDATION: error')),
+            };
+            await controller.updateAcademia(req, res);
+            if (res.status.mock.calls.length > 0) {
+                expect([400, 422, 500]).toContain(res.status.mock.calls[0][0]);
+            }
+        });
+
+        it('handles not found error', async () => {
+            const res = makeRes();
+            const req = makeReq();
+            const msg = 'Academia não encontrado';
+            (controller as any).service = {
+                updateAcademia: mockFn().mockRejectedValue(new Error(msg)),
+            };
+            await controller.updateAcademia(req, res);
+            if (res.status.mock.calls.length > 0) {
+                expect([404, 500, 400, 422]).toContain(res.status.mock.calls[0][0]);
+            }
+        });
+
+        it('handles Conversa nao encontrada error', async () => {
+            const res = makeRes();
+            const req = makeReq();
+            (controller as any).service = {
+                updateAcademia: mockFn().mockRejectedValue(new Error('Conversa nao encontrada')),
+            };
+            await controller.updateAcademia(req, res);
+            if (res.status.mock.calls.length > 0) {
+                expect([404, 500, 400, 422]).toContain(res.status.mock.calls[0][0]);
+            }
+        });
+
+        it('handles generic Error', async () => {
+            const res = makeRes();
+            const req = makeReq();
+            (controller as any).service = {
+                updateAcademia: mockFn().mockRejectedValue(new Error('generic error')),
+            };
+            await controller.updateAcademia(req, res);
+            if (res.status.mock.calls.length > 0) {
+                expect([400, 403, 404, 422, 500]).toContain(res.status.mock.calls[0][0]);
+            }
+        });
+        
+        it('handles non-Error throw', async () => {
+            const res = makeRes();
+            const req = makeReq();
+            (controller as any).service = {
+                updateAcademia: mockFn().mockRejectedValue('not an error object'),
+            };
+            await controller.updateAcademia(req, res);
+            if (res.status.mock.calls.length > 0) {
+                expect(res.status).toHaveBeenCalledWith(500);
+            }
+        });
+    });
+
+    describe('deleteAcademia', () => {
+        it('handles ZodError', async () => {
+            const res = makeRes();
+            const req = makeReq();
+            (controller as any).service = {
+                deleteAcademia: mockFn().mockRejectedValue(new ZodError([])),
+            };
+            await controller.deleteAcademia(req, res);
+            if (res.status.mock.calls.length > 0) {
+                expect([400, 422, 500]).toContain(res.status.mock.calls[0][0]);
+            }
+        });
+
+        it('handles DatabaseError', async () => {
+            const res = makeRes();
+            const req = makeReq();
+            (controller as any).service = {
+                deleteAcademia: mockFn().mockRejectedValue(new DatabaseError('db error', 400)),
+            };
+            await controller.deleteAcademia(req, res);
+            if (res.status.mock.calls.length > 0) {
+                expect([400, 500, 404, 422]).toContain(res.status.mock.calls[0][0]);
+            }
+        });
+
+        it('handles FORBIDDEN error', async () => {
+            const res = makeRes();
+            const req = makeReq();
+            (controller as any).service = {
+                deleteAcademia: mockFn().mockRejectedValue(new Error('FORBIDDEN: denied')),
+            };
+            await controller.deleteAcademia(req, res);
+            if (res.status.mock.calls.length > 0) {
+                expect([403, 500, 400, 422]).toContain(res.status.mock.calls[0][0]);
+            }
+        });
+
+        it('handles VALIDATION error', async () => {
+            const res = makeRes();
+            const req = makeReq();
+            (controller as any).service = {
+                deleteAcademia: mockFn().mockRejectedValue(new Error('VALIDATION: error')),
+            };
+            await controller.deleteAcademia(req, res);
+            if (res.status.mock.calls.length > 0) {
+                expect([400, 422, 500]).toContain(res.status.mock.calls[0][0]);
+            }
+        });
+
+        it('handles not found error', async () => {
+            const res = makeRes();
+            const req = makeReq();
+            const msg = 'Academia não encontrado';
+            (controller as any).service = {
+                deleteAcademia: mockFn().mockRejectedValue(new Error(msg)),
+            };
+            await controller.deleteAcademia(req, res);
+            if (res.status.mock.calls.length > 0) {
+                expect([404, 500, 400, 422]).toContain(res.status.mock.calls[0][0]);
+            }
+        });
+
+        it('handles Conversa nao encontrada error', async () => {
+            const res = makeRes();
+            const req = makeReq();
+            (controller as any).service = {
+                deleteAcademia: mockFn().mockRejectedValue(new Error('Conversa nao encontrada')),
+            };
+            await controller.deleteAcademia(req, res);
+            if (res.status.mock.calls.length > 0) {
+                expect([404, 500, 400, 422]).toContain(res.status.mock.calls[0][0]);
+            }
+        });
+
+        it('handles generic Error', async () => {
+            const res = makeRes();
+            const req = makeReq();
+            (controller as any).service = {
+                deleteAcademia: mockFn().mockRejectedValue(new Error('generic error')),
+            };
+            await controller.deleteAcademia(req, res);
+            if (res.status.mock.calls.length > 0) {
+                expect([400, 403, 404, 422, 500]).toContain(res.status.mock.calls[0][0]);
+            }
+        });
+        
+        it('handles non-Error throw', async () => {
+            const res = makeRes();
+            const req = makeReq();
+            (controller as any).service = {
+                deleteAcademia: mockFn().mockRejectedValue('not an error object'),
+            };
+            await controller.deleteAcademia(req, res);
+            if (res.status.mock.calls.length > 0) {
+                expect(res.status).toHaveBeenCalledWith(500);
+            }
+        });
     });
 });

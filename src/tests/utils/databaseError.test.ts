@@ -1,10 +1,11 @@
-import { describe, it, expect, jest, beforeEach } from '@jest/globals';
+import { describe, it, expect, jest, beforeEach, afterEach } from '@jest/globals';
 import { DatabaseError, parseDatabaseError } from '../../utils/errors/DatabaseError';
 import { DatabaseError as PgDatabaseError } from 'pg';
 
 // Cria um PgDatabaseError simulado com os campos necessários
 function makePgError(code: string, message = 'pg error', detail?: string, constraint?: string): PgDatabaseError {
-    const err = new PgDatabaseError(message);
+    const err = Object.create((PgDatabaseError as any).prototype) as PgDatabaseError;
+    (err as any).message = message;
     (err as any).code = code;
     (err as any).detail = detail ?? null;
     (err as any).constraint = constraint ?? null;

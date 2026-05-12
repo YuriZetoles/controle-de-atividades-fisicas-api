@@ -1,44 +1,50 @@
+// Helper para evitar TS2345 "not assignable to parameter of type never"
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function mockFn() {
+  return jest.fn() as jest.MockedFunction<(...args: any[]) => any>;
+}
+
 // Mock dos módulos externos ANTES dos imports do UploadService
 jest.mock('../../config/garageHqConnect', () => ({
     minioClient: {
-        putObject: jest.fn(),
-        statObject: jest.fn(),
-        removeObject: jest.fn(),
+        putObject: mockFn(),
+        statObject: mockFn(),
+        removeObject: mockFn(),
     },
     minioConfig: {
         bucket: 'test-bucket',
     },
     getPublicObjectUrl: jest.fn((key: string) => `https://cdn.test/${key}`),
-    prepareMinioUpload: jest.fn(),
+    prepareMinioUpload: mockFn(),
 }));
 
 jest.mock('fluent-ffmpeg', () => {
     const mockFfmpeg: any = jest.fn(() => ({
-        videoCodec: jest.fn().mockReturnThis(),
-        outputOptions: jest.fn().mockReturnThis(),
-        format: jest.fn().mockReturnThis(),
-        on: jest.fn().mockImplementation(function (this: any, event: string, cb: any) {
+        videoCodec: mockFn().mockReturnThis(),
+        outputOptions: mockFn().mockReturnThis(),
+        format: mockFn().mockReturnThis(),
+        on: mockFn().mockImplementation(function (this: any, event: string, cb: any) {
             if (event === 'end') setTimeout(() => cb(), 0);
             return this;
-        }),
-        save: jest.fn(),
+        } as any),
+        save: mockFn(),
     }));
     return mockFfmpeg;
 });
 
 jest.mock('fs/promises', () => ({
     __esModule: true,
-    mkdtemp: jest.fn().mockResolvedValue('/tmp/webm-test'),
-    writeFile: jest.fn().mockResolvedValue(undefined),
-    readFile: jest.fn().mockResolvedValue(Buffer.from('encoded-webm')),
-    unlink: jest.fn().mockResolvedValue(undefined),
-    rmdir: jest.fn().mockResolvedValue(undefined),
+    mkdtemp: mockFn().mockResolvedValue('/tmp/webm-test'),
+    writeFile: mockFn().mockResolvedValue(undefined),
+    readFile: mockFn().mockResolvedValue(Buffer.from('encoded-webm')),
+    unlink: mockFn().mockResolvedValue(undefined),
+    rmdir: mockFn().mockResolvedValue(undefined),
     default: {
-        mkdtemp: jest.fn().mockResolvedValue('/tmp/webm-test'),
-        writeFile: jest.fn().mockResolvedValue(undefined),
-        readFile: jest.fn().mockResolvedValue(Buffer.from('encoded-webm')),
-        unlink: jest.fn().mockResolvedValue(undefined),
-        rmdir: jest.fn().mockResolvedValue(undefined),
+        mkdtemp: mockFn().mockResolvedValue('/tmp/webm-test'),
+        writeFile: mockFn().mockResolvedValue(undefined),
+        readFile: mockFn().mockResolvedValue(Buffer.from('encoded-webm')),
+        unlink: mockFn().mockResolvedValue(undefined),
+        rmdir: mockFn().mockResolvedValue(undefined),
     },
 }));
 

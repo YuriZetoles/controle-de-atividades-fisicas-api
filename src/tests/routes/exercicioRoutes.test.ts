@@ -1,12 +1,18 @@
+// Helper para evitar TS2345 "not assignable to parameter of type never"
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function mockFn() {
+  return jest.fn() as jest.MockedFunction<(...args: any[]) => any>;
+}
+
 jest.mock('../../middlewares/authMiddleware', () => ({
-    authMiddleware: jest.fn(),
+    authMiddleware: mockFn(),
 }));
 jest.mock('../../middlewares/adminMiddleware', () => ({
     adminMiddleware: jest.fn((_req: any, _res: any, next: any) => next()),
 }));
 jest.mock('../../services/uploadService', () => ({
     __esModule: true,
-    default: jest.fn().mockImplementation(() => ({
+    default: mockFn().mockImplementation(() => ({
         uploadFiles: jest.fn<() => Promise<{ url: string }[]>>().mockResolvedValue([{ url: 'http://test-s3.local/animacoes/test.gif' }]),
         deleteFile: jest.fn<() => Promise<void>>().mockResolvedValue(),
     })),
@@ -15,7 +21,7 @@ jest.mock('../../services/uploadService', () => ({
 import { randomUUID } from 'crypto';
 import express from 'express';
 import request from 'supertest';
-import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from '@jest/globals';
+import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, jest } from '@jest/globals';
 import exercicioRoutes from '../../routes/exercicioRoutes';
 import { globalErrorHandler } from '../../middlewares/globalErrorHandler';
 import { DbConnect, DataBase } from '../../config/DbConnect';
@@ -196,8 +202,6 @@ beforeAll(async () => {
         sexo: 'M',
         cref: `ADM-${RUN_ID}`.substring(0, 50),
         turnos: ['MANHA'],
-        especializacao: 'Geral',
-        graduacao: 'Graduado',
         especializacao: 'Administração',
         graduacao: 'Educação Física',
         is_admin: true,
@@ -262,8 +266,6 @@ beforeAll(async () => {
         sexo: 'M',
         cref: `TST-${RUN_ID}`.substring(0, 50),
         turnos: ['MANHA'],
-        especializacao: 'Geral',
-        graduacao: 'Graduado',
         especializacao: 'Teste',
         graduacao: 'Teste',
         is_admin: false,
