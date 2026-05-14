@@ -326,6 +326,19 @@ afterAll(async () => {
         await DataBase.delete(exercicio).where(inArray(exercicio.id, ids)).catch(() => {});
     }
 
+    const exerciciosTreinadores = await DataBase
+        .select({ id: exercicio.id })
+        .from(exercicio)
+        .where(inArray(exercicio.treinador_id, [adminTreinadorId, treinadorRecId]));
+
+    if (exerciciosTreinadores.length > 0) {
+        const ids = exerciciosTreinadores.map((e) => e.id!);
+        await DataBase.delete(treino_exercicio).where(inArray(treino_exercicio.exercicio_id, ids)).catch(() => {});
+        await DataBase.delete(exercicio_musculo).where(inArray(exercicio_musculo.exercicio_id, ids)).catch(() => {});
+        await DataBase.delete(exercicio_aparelho).where(inArray(exercicio_aparelho.exercicio_id, ids)).catch(() => {});
+        await DataBase.delete(exercicio).where(inArray(exercicio.id, ids)).catch(() => {});
+    }
+
     // 3. Músculos e aparelho de teste
     await DataBase.delete(exercicio_musculo).where(eq(exercicio_musculo.musculo_id, musculoId)).catch(() => {});
     await DataBase.delete(exercicio_musculo).where(eq(exercicio_musculo.musculo_id, musculo2Id)).catch(() => {});
@@ -473,14 +486,16 @@ describe('POST /exercicios', () => {
         expect(res.body.message).toMatch(/você não pode criar exercícios para outro aluno/i);
     });
 
-    it('treinador tenta criar exercício global (sem aluno_id) → 403', async () => {
+    it('treinador cria exercício sem aluno_id → 201 cria exercício pessoal de treinador', async () => {
         asTreinador();
         const res = await request(app)
             .post('/api/exercicios')
-            .send(buildPayloadGlobal(`Treinador Global Forbidden ${RUN_ID}`));
+            .send(buildPayloadGlobal(`Treinador Proprio ${RUN_ID}`));
 
-        expect(res.status).toBe(403);
-        expect(res.body.message).toMatch(/apenas administradores podem criar exercícios globais/i);
+        expect(res.status).toBe(201);
+        expect(res.body.data.aluno_id).toBeNull();
+        expect(res.body.data.treinador_id).toBe(treinadorRecId);
+        if (res.body.data?.id) criados.push(res.body.data.id);
     });
 
     it('body vazio → 422 com issues Zod', async () => {
@@ -997,20 +1012,18 @@ describe('GET /exercicios', () => {
         expect(res.body.message).toMatch(/apenas administradores podem listar exercícios inativos/i);
     });
 
-    it('treinador sem perfil de aluno usa escopo=TODOS sem aluno_id → 422', async () => {
+    it('treinador sem perfil de aluno usa escopo=TODOS sem aluno_id → 200 retorna exercícios dele', async () => {
         asTreinador();
         const res = await request(app).get('/api/exercicios?escopo=TODOS');
 
-        expect(res.status).toBe(422);
-        expect(res.body.message).toMatch(/aluno_id é obrigatório/i);
+        expect(res.status).toBe(200);
     });
 
-    it('treinador sem perfil de aluno usa escopo=PESSOAL sem aluno_id → 422', async () => {
+    it('treinador sem perfil de aluno usa escopo=PESSOAL sem aluno_id → 200 retorna exercícios dele', async () => {
         asTreinador();
         const res = await request(app).get('/api/exercicios?escopo=PESSOAL');
 
-        expect(res.status).toBe(422);
-        expect(res.body.message).toMatch(/aluno_id é obrigatório/i);
+        expect(res.status).toBe(200);
     });
 
     it('aluno_id com UUID inválido → 422', async () => {
