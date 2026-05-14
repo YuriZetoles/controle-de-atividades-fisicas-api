@@ -235,7 +235,7 @@ class ExercicioService {
             const perfil = await this.usuarioRepository.buscarPerfilAcesso(userId);
             if (!perfil.isAdmin && perfil.treinadorId !== exercicioEncontrado.treinador_id) {
                 if (perfil.isAluno) {
-                    if (perfil.treinadorId !== exercicioEncontrado.treinador_id) {
+                    if (perfil.alunoTreinadorId !== exercicioEncontrado.treinador_id) {
                         throw new Error('FORBIDDEN: você não tem permissão para visualizar este exercício');
                     }
                 } else {
