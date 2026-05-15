@@ -31,23 +31,24 @@ router.get("/me", authMiddleware, async (req, res) => {
 
     let dadosCompletos: any = null;
 
-    if (perfilAcesso.isTreinador && perfilAcesso.treinadorId) {
-      const treinadorRepo = new TreinadorRepository();
-      dadosCompletos = await treinadorRepo.findById(perfilAcesso.treinadorId);
-    } else if (perfilAcesso.isAluno && perfilAcesso.alunoId) {
-      const alunoRepo = new AlunoRepository();
-      dadosCompletos = await alunoRepo.findById(perfilAcesso.alunoId);
+    if (perfilAcesso.isTreinador && user.id) {
+        const treinadorRepo = new TreinadorRepository();
+        dadosCompletos = await treinadorRepo.findFullByUserId(user.id);
+    } else if (perfilAcesso.isAluno && user.id) {
+        const alunoRepo = new AlunoRepository();
+        dadosCompletos = await alunoRepo.findFullByUserId(user.id);
     }
 
     res.json({
-      success: true,
-      data: {
-        ...user, // Dados básicos do Better Auth (id, name, email, image)
-        tipo: perfilAcesso.isTreinador ? "treinador" : "aluno",
-        isAdmin: perfilAcesso.isAdmin,
-        perfil: dadosCompletos, // Dados específicos (peso, altura, CREF, etc)
-      },
+        success: true,
+        data: {
+            ...user,
+            tipo: perfilAcesso.isTreinador ? "treinador" : "aluno",
+            isAdmin: perfilAcesso.isAdmin,
+            perfil: dadosCompletos
+        },
     });
+
   } catch (error) {
     console.error("[authRoutes] Erro na rota /me:", error);
     res
