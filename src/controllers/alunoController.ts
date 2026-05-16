@@ -179,10 +179,12 @@ class AlunoController {
         alunoEditadoBody.url_foto = fotoResolvida;
       }
 
-      const alunoAtualizado = await this.service.updateAluno(id, alunoEditadoBody);
+      await this.service.updateAluno(id, alunoEditadoBody);
+      const alunoCompleto = await this.service.getAlunoByUserId(body.user_id || (req as any).user.id);
+      
       return CommonResponse.success(
         res,
-        alunoAtualizado,
+        alunoCompleto,
         HttpStatusCode.OK.code,
         "Aluno atualizado com sucesso",
       );

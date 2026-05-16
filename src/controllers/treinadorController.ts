@@ -192,16 +192,18 @@ class TreinadorController {
 					treinadorEditadoBody.url_foto = fotoResolvida;
 				}
 
-	                const treinadorAtualizado = await this.service.updateTreinador(
-	                        id,
-	                        treinadorEditadoBody,
-	                );
-	                return CommonResponse.success(
-	                        res,
-	                        treinadorAtualizado,
-	                        HttpStatusCode.OK.code,
-	                        "Treinador atualizado com sucesso",
-	                );
+				await this.service.updateTreinador(
+					id,
+					treinadorEditadoBody,
+				);
+				const treinadorCompleto = await this.service.getTreinadorByUserId(body.user_id || (req as any).user.id);
+				
+				return CommonResponse.success(
+					res,
+					treinadorCompleto,
+					HttpStatusCode.OK.code,
+					"Treinador atualizado com sucesso",
+				);
 	        } catch (error) {
 	                if (fotoUrl) await this.deleteFoto(fotoUrl);
 	                return this.handleError(res, error, "updateTreinador");
