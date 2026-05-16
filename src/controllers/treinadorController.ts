@@ -196,7 +196,7 @@ class TreinadorController {
 					id,
 					treinadorEditadoBody,
 				);
-				const treinadorCompleto = await this.service.getTreinadorByUserId(body.user_id || (req as any).user.id);
+				const treinadorCompleto = await this.service.getTreinadorById(id);
 				
 				return CommonResponse.success(
 					res,

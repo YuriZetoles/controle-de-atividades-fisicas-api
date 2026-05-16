@@ -180,7 +180,7 @@ class AlunoController {
       }
 
       await this.service.updateAluno(id, alunoEditadoBody);
-      const alunoCompleto = await this.service.getAlunoByUserId(body.user_id || (req as any).user.id);
+      const alunoCompleto = await this.service.getAlunoById(id);
       
       return CommonResponse.success(
         res,
