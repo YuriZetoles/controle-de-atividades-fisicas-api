@@ -10,17 +10,17 @@ export const auth = betterAuth({
 
   database: drizzleAdapter(DataBase, {
     provider: "pg",
-    useRuntimeFilters: true, // Adicionado para suportar colunas customizadas
-    user: {
-      additionalFields: {
-        tipo: {
-          type: "string",
-          required: true,
-          defaultValue: "aluno",
-        },
+  }),
+
+  user: {
+    additionalFields: {
+      tipo: {
+        type: "string",
+        required: true,
+        defaultValue: "aluno",
       },
     },
-  }),
+  },
 
   plugins: [
     bearer()

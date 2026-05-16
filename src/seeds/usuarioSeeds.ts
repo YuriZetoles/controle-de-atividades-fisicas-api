@@ -111,7 +111,7 @@ export async function seedUsuarios(academiasIds: string[], treinadores: Treinado
                 email: seed.email, 
                 password: seed.password,
                 tipo: "aluno" 
-            },
+            } as any,
         });
         const treinadorId = seed.treinadorNome
             ? treinadores.find((treinador) => treinador.nome === seed.treinadorNome)?.id

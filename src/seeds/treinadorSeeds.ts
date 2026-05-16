@@ -71,8 +71,9 @@ export async function seedTreinadores(academiasIds: string[]): Promise<Treinador
 	                        email: seed.email, 
 	                        password: seed.password,
 	                        tipo: "treinador"
-	                },
+	                } as any,
 	        });
+
 		treinadoresValues.push({
 			user_id: authUser.user.id,
 			academia_id: academiasIds[seed.academiaIndex],
